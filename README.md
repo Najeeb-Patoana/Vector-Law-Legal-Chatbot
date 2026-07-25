@@ -242,8 +242,8 @@ Legal ChatBot/
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/ -username/legal-chatbot.git
-cd legal-chatbot
+git clone https://github.com/Najeeb-Patoana/Vector-Law-Legal-Chatbot.git
+cd vector-law-legal-chatbot
 
 # 2. Install server dependencies
 cd server
