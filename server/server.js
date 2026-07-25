@@ -10,6 +10,8 @@ const { createEmbedding }              = require("./helpers/embedding");
 const { generate }                     = require("./helpers/llmManager");
 const { initializeQdrant,
         searchGlobalLegalContext }      = require("./helpers/qdrant");
+const { initializeReranker,
+        rerank }                       = require("./helpers/reranker");
 
 function getClientIp(req) {
     let ip = req.ip || req.socket?.remoteAddress || "";
@@ -251,7 +253,19 @@ app.post("/api/legal/ask", askLimiter, async (req, res) => {
         const queryVector = await createEmbedding(question);
 
         console.log("[ASK] Searching knowledge base…");
-        const contextPayloads = await searchGlobalLegalContext(queryVector, 15);
+        // Stage 1: cast a wide net — retrieve top 50 candidates by vector similarity
+        const rawCandidates = await searchGlobalLegalContext(queryVector, 50);
+
+        // Stage 2: rerank with the cross-encoder and keep the top 5.
+        // If the reranker is unavailable (e.g. failed to load), fall back
+        // gracefully to the original top-15 vector results so the API never crashes.
+        let contextPayloads;
+        try {
+            contextPayloads = await rerank(question, rawCandidates);
+        } catch (rerankerErr) {
+            console.error("[ASK] Reranker failed, falling back to top-15 vector results:", rerankerErr.message);
+            contextPayloads = rawCandidates.slice(0, 15);
+        }
 
         // Build structured context block
         let contextBlock = "";
@@ -321,6 +335,14 @@ async function start() {
     } catch (err) {
         console.warn("[Server] Qdrant not ready at startup:", err.message?.split("\n")[0]);
         console.warn("[Server] The collection will be created on first ingestion run.");
+    }
+
+    // Initialize Reranker (non-fatal — server still starts if this fails)
+    try {
+        await initializeReranker();
+    } catch (err) {
+        console.warn("[Server] Reranker unavailable:", err.message);
+        console.warn("[Server] Will fall back to top-15 vector results on each request.");
     }
 
     app.listen(PORT, () => {

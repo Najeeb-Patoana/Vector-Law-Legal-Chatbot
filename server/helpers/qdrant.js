@@ -52,7 +52,7 @@ async function storeChunks(chunkPoints, maxRetries = 5) {
 
 // ── Search ────────────────────────────────────────────────────────────────────
 
-async function searchGlobalLegalContext(queryVector, limit = 15) {
+async function searchGlobalLegalContext(queryVector, limit = 50) {
     const results = await qdrant.search(COLLECTION, {
         vector: queryVector,
         limit,
