@@ -2,11 +2,19 @@ require("dotenv").config();
 const { Pool } = require("pg");
 
 const pool = new Pool({
-  host:     process.env.DB_HOST     || "localhost",
-  port:     parseInt(process.env.DB_PORT ?? "5432", 10),
-  user:     process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
+  host:                 process.env.DB_HOST     || "localhost",
+  port:                 parseInt(process.env.DB_PORT ?? "5432", 10),
+  user:                 process.env.DB_USER,
+  password:             process.env.DB_PASSWORD,
+  database:             process.env.DB_NAME,
+  max:                  20,              // max connections in pool
+  idleTimeoutMillis:    30_000,          // close idle clients after 30 s
+  connectionTimeoutMillis: 2_000,        // error if no connection within 2 s
+});
+
+// Surface unexpected pool errors instead of silently crashing
+pool.on("error", (err) => {
+  console.error("[DB] Unexpected pool client error:", err.message);
 });
 
 const SCHEMA_SQL = `
@@ -47,6 +55,23 @@ const SCHEMA_SQL = `
     content    TEXT NOT NULL,
     created_at TIMESTAMP DEFAULT NOW()
   );
+
+  -- ── Indexes ─────────────────────────────────────────────────────────────
+  -- Speeds up: GET /api/chat/sessions/:id/messages (WHERE session_id ORDER BY created_at)
+  CREATE INDEX IF NOT EXISTS idx_messages_session_time
+    ON vl_messages(session_id, created_at);
+
+  -- Speeds up: GET /api/chat/sessions (WHERE user_id ORDER BY created_at DESC)
+  CREATE INDEX IF NOT EXISTS idx_sessions_user_time
+    ON vl_chat_sessions(user_id, created_at);
+
+  -- Speeds up: email verification token lookup on every verify-email click
+  CREATE INDEX IF NOT EXISTS idx_verifications_token
+    ON vl_email_verifications(token);
+
+  -- Speeds up: periodic cleanup query (DELETE WHERE last_request < X)
+  CREATE INDEX IF NOT EXISTS idx_guest_limits_last_request
+    ON vl_guest_limits(last_request);
 `;
 
 async function initDB() {

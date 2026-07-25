@@ -1,7 +1,10 @@
 import axios from 'axios'
 
-const API = axios.create({ 
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3000' 
+// No baseURL — all requests use relative paths (e.g. /api/auth/login)
+// so they are forwarded by the Vite dev proxy to the backend.
+// In production, configure a reverse proxy or set VITE_API_URL at build time.
+const API = axios.create({
+  baseURL: import.meta.env.VITE_API_URL || '',
 })
 let currentToken = null;
 

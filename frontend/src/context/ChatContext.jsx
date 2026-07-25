@@ -2,17 +2,14 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 import { useAuth } from './AuthContext'
 import { askLegalQuestion, getGuestStatus } from '../services/api.js'
 import * as chatApi from '../services/authApi.js'
-
-// ── Constants ──────────────────────────────────────────────────────────────────
-const FREE_LIMIT     = 4
+const DEFAULT_FREE_LIMIT = 4
 const GUEST_COUNT_KEY = 'vl_guestMsgCount'
 
 const ChatContext = createContext(null)
 
-// ── Helper: build a local message object ──────────────────────────────────────
 function makeMsg(role, text, extra = {}) {
   return {
-    id:   Date.now() + Math.random(), // unique enough for optimistic rendering
+    id: Date.now() + Math.random(),
     role,
     text,
     time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -24,19 +21,22 @@ export function ChatProvider({ children }) {
   const { user, accessToken } = useAuth()
 
   // ── Server-side data ───────────────────────────────────────────────────────
-  const [sessions,        setSessions]        = useState([])
-  const [activeSession,   setActiveSession]   = useState(null)
-  const [messages,        setMessages]        = useState([])
-  const [isLoading,       setIsLoading]       = useState(false)
+  const [sessions, setSessions] = useState([])
+  const [activeSession, setActiveSession] = useState(null)
+  const [messages, setMessages] = useState([])
+  const [isLoading, setIsLoading] = useState(false)
   const [sessionsLoading, setSessionsLoading] = useState(false)
 
-  // ── Guest usage counter — synced from server + persisted locally ───────────
+  // ── Guest usage + server-authoritative FREE_LIMIT ────────────────────────
   const [guestCount, setGuestCount] = useState(() => {
     if (typeof window === 'undefined') return 0
     return parseInt(localStorage.getItem(GUEST_COUNT_KEY) || '0', 10)
   })
+  // Starts at a safe default; overwritten by the first server response so
+  // the UI always reflects the value the server actually enforces.
+  const [FREE_LIMIT, setFreeLimit] = useState(DEFAULT_FREE_LIMIT)
 
-  // ── Sync guest usage from server (guests only) ────────────────────────────
+  // ── Sync guest usage AND authoritative limit from server (guests only) ──────
   useEffect(() => {
     if (user) return
     getGuestStatus()
@@ -44,6 +44,10 @@ export function ChatProvider({ children }) {
         if (data && typeof data.usage === 'number') {
           setGuestCount(data.usage)
           localStorage.setItem(GUEST_COUNT_KEY, String(data.usage))
+        }
+        // Server owns the limit — update the client to match
+        if (data && typeof data.limit === 'number') {
+          setFreeLimit(data.limit)
         }
       })
       .catch(console.error)
@@ -78,11 +82,11 @@ export function ChatProvider({ children }) {
         if (data.success) {
           setMessages(
             data.messages.map((m) => ({
-              id:   m.message_id,
+              id: m.message_id,
               role: m.role,
               text: m.content,
               time: new Date(m.created_at).toLocaleTimeString([], {
-                hour:   '2-digit',
+                hour: '2-digit',
                 minute: '2-digit',
               }),
             }))
@@ -165,10 +169,13 @@ export function ChatProvider({ children }) {
     try {
       const resData = await askLegalQuestion(trimmed, { token: accessToken || undefined })
 
-      // Update guest count from server response
+      // Update guest count AND limit from server response
       if (!user && resData.guestUsage !== undefined) {
         setGuestCount(resData.guestUsage)
         localStorage.setItem(GUEST_COUNT_KEY, String(resData.guestUsage))
+      }
+      if (!user && typeof resData.guestLimit === 'number') {
+        setFreeLimit(resData.guestLimit)
       }
 
       const assistantMsg = makeMsg('assistant', resData.answer)
