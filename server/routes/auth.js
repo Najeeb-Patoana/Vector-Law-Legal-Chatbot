@@ -5,7 +5,7 @@ const jwt        = require("jsonwebtoken");
 const crypto     = require("crypto");
 const nodemailer = require("nodemailer");
 const { OAuth2Client } = require("google-auth-library");
-const { pool }   = require("../db");
+const { pool, cleanupExpiredVerifications } = require("../db");
 
 const router       = express.Router();
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
@@ -104,15 +104,23 @@ router.post("/register", async (req, res) => {
 
 // ── GET /api/auth/verify-email ────────────────────────────────────────────────
 router.get("/verify-email", async (req, res) => {
-  try {
-    const { token } = req.query;
-    if (!token) return res.status(400).send("<h2>Invalid verification link.</h2>");
+  const { token } = req.query;
+  if (!token) return res.status(400).send("<h2>Invalid verification link.</h2>");
 
-    const result = await pool.query(
-      "SELECT * FROM vl_email_verifications WHERE token = $1 AND expires_at > NOW()",
+  // Acquire a dedicated client so we can run a proper transaction
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    // 1. Look up the token — must exist and not be expired
+    const result = await client.query(
+      `SELECT user_id FROM vl_email_verifications
+       WHERE token = $1 AND expires_at > NOW()`,
       [token]
     );
+
     if (!result.rows.length) {
+      await client.query("ROLLBACK");
       return res.status(400).send(`
         <html><body style="font-family:sans-serif;text-align:center;padding:60px;background:#0f172a;color:#e2e8f0;">
           <h2>Link expired or invalid.</h2>
@@ -122,8 +130,21 @@ router.get("/verify-email", async (req, res) => {
     }
 
     const { user_id } = result.rows[0];
-    await pool.query("UPDATE vl_users SET is_verified = TRUE WHERE user_id = $1", [user_id]);
-    await pool.query("DELETE FROM vl_email_verifications WHERE user_id = $1", [user_id]);
+
+    // 2. Mark the user as verified
+    await client.query(
+      "UPDATE vl_users SET is_verified = TRUE WHERE user_id = $1",
+      [user_id]
+    );
+
+    // 3. Delete the token by its own value so it can never be reused,
+    //    even if another request arrives concurrently for the same user.
+    await client.query(
+      "DELETE FROM vl_email_verifications WHERE token = $1",
+      [token]
+    );
+
+    await client.query("COMMIT");
 
     return res.send(`
       <html><body style="font-family:sans-serif;text-align:center;padding:60px;background:#0f172a;color:#e2e8f0;">
@@ -138,8 +159,13 @@ router.get("/verify-email", async (req, res) => {
       </body></html>
     `);
   } catch (err) {
+    // Best-effort rollback — ignore secondary errors
+    try { await client.query("ROLLBACK"); } catch (_) {}
     console.error("[Auth] verify-email error:", err.message);
     return res.status(500).send("<h2>Server error. Please try again.</h2>");
+  } finally {
+    // Always release the client back to the pool
+    client.release();
   }
 });
 

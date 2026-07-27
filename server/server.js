@@ -6,7 +6,7 @@ const helmet    = require("helmet");
 const rateLimit = require("express-rate-limit");
 
 // ── Startup-time initializers ─────────────────────────────────────────────────
-const { initDB }             = require("./db");
+const { initDB, scheduleVerificationCleanup } = require("./db");
 const { initializeQdrant }   = require("./helpers/qdrant");
 const { initializeReranker } = require("./helpers/reranker");
 
@@ -75,6 +75,7 @@ async function start() {
     // 1. PostgreSQL schema
     try {
         await initDB();
+        scheduleVerificationCleanup(); 
     } catch (err) {
         console.error("[Server] DB init failed:", err.message);
         process.exit(1);

@@ -86,4 +86,43 @@ async function initDB() {
   }
 }
 
-module.exports = { pool, initDB };
+// ── Cleanup: sweep expired email-verification tokens ─────────────────────────
+/**
+ * Deletes all rows from vl_email_verifications whose expires_at is in the past.
+ * Safe to call at any time — uses pool.query (single statement, no transaction needed).
+ * @returns {Promise<number>} number of rows deleted
+ */
+async function cleanupExpiredVerifications() {
+  const result = await pool.query(
+    "DELETE FROM vl_email_verifications WHERE expires_at < NOW()"
+  );
+  const count = result.rowCount ?? 0;
+  if (count > 0) {
+    console.log(`[DB] Cleaned up ${count} expired verification token(s).`);
+  }
+  return count;
+}
+
+/**
+ * Runs cleanupExpiredVerifications once immediately, then on a recurring
+ * interval (default: every 1 hour).  Call this once from server.js at startup.
+ * @param {number} [intervalMs=3_600_000] sweep interval in milliseconds
+ */
+function scheduleVerificationCleanup(intervalMs = 60 * 60 * 1_000) {
+  cleanupExpiredVerifications().catch((err) =>
+    console.error("[DB] Initial verification cleanup failed:", err.message)
+  );
+
+  const timer = setInterval(() => {
+    cleanupExpiredVerifications().catch((err) =>
+      console.error("[DB] Scheduled verification cleanup failed:", err.message)
+    );
+  }, intervalMs);
+
+  // Don't let this timer block process exit
+  if (timer.unref) timer.unref();
+
+  console.log(`[DB] Verification cleanup scheduled every ${intervalMs / 60_000} min.`);
+}
+
+module.exports = { pool, initDB, cleanupExpiredVerifications, scheduleVerificationCleanup };
