@@ -23,16 +23,12 @@ const ALLOWED_ORIGINS = (process.env.CORS_ORIGIN || "http://localhost:5173")
 
 const PORT = parseInt(process.env.PORT ?? "3000", 10);
 
-// ── App ───────────────────────────────────────────────────────────────────────
 const app = express();
 
-// Enable proxy trusting (essential for accurate IP detection behind load balancers)
 app.set("trust proxy", 1);
 
-// Security headers (hides X-Powered-By, sets CSP, etc.)
 app.use(helmet());
 
-// CORS — allowed origins loaded from CORS_ORIGIN env var
 app.use(cors({
     origin: ALLOWED_ORIGINS,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
@@ -40,15 +36,13 @@ app.use(cors({
     optionsSuccessStatus: 200,
 }));
 
-// Reject oversized request bodies early
 app.use(express.json({ limit: "1mb" }));
 
 // ── Rate Limiters ─────────────────────────────────────────────────────────────
 
-// Strict limiter for auth endpoints — prevents brute-force and credential stuffing
 const authLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,   // 15-minute window
-    max: 10,                      // 10 attempts per IP before lockout
+    windowMs: 15 * 60 * 1000,  
+    max: 10,               
     standardHeaders: true,
     legacyHeaders: false,
     message: { success: false, message: "Too many attempts. Please try again in 15 minutes." },
@@ -63,7 +57,7 @@ app.get("/", (_req, res) => {
 // Auth routes are protected by the strict authLimiter
 app.use("/api/auth",  authLimiter, authRouter);
 app.use("/api/chat",  chatRouter);
-app.use("/api/legal", legalRouter);   // has its own askLimiter inside
+app.use("/api/legal", legalRouter);  
 
 // ── 404 catch-all ─────────────────────────────────────────────────────────────
 app.use((_req, res) => {
@@ -77,7 +71,6 @@ app.use((err, _req, res, _next) => {
     return res.status(500).json({ success: false, message: "An unexpected error occurred." });
 });
 
-// ── Startup ───────────────────────────────────────────────────────────────────
 async function start() {
     // 1. PostgreSQL schema
     try {
