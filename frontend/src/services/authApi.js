@@ -23,6 +23,21 @@ API.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+// Extract user-friendly messages from server error responses
+API.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const serverMessage = error?.response?.data?.message;
+    if (serverMessage) {
+      const friendlyError = new Error(serverMessage);
+      // Preserve any extra fields (e.g. needsVerification)
+      Object.assign(friendlyError, error.response.data);
+      return Promise.reject(friendlyError);
+    }
+    return Promise.reject(error);
+  }
+);
+
 // ── Auth ──────────────────────────────────────────────────────────────────────
 export const register = (data) =>
   API.post('/api/auth/register', data).then((r) => r.data)

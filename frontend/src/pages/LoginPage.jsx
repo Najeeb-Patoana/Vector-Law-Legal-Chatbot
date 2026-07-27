@@ -25,7 +25,7 @@ export default function LoginPage() {
       await login(email.trim(), password)
       navigate('/', { replace: true })
     } catch (err) {
-      if (err.message?.toLowerCase().includes('verify')) {
+      if (err.needsVerification || err.message?.toLowerCase().includes('verify')) {
         setInfo(err.message)
       } else {
         setError(err.message || 'Login failed. Please try again.')
