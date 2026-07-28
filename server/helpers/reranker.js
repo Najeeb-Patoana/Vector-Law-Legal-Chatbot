@@ -70,11 +70,11 @@ async function rerank(question, documents) {
     // depending on the model head — we always use the numeric `.score` field.
     const ranked = documents
         .map((doc, i) => ({
-            ...doc,                              // preserve all existing payload fields
-            rerankScore: scores[i]?.score ?? 0, // attach the reranker relevance score
+            ...doc,                             
+            rerankScore: scores[i]?.score ?? 0, 
         }))
-        .sort((a, b) => b.rerankScore - a.rerankScore) // highest score first
-        .slice(0, TOP_K);                              // keep only the top K
+        .sort((a, b) => b.rerankScore - a.rerankScore) 
+        .slice(0, TOP_K);                              
 
     console.log(`[Reranker] Selected Top ${ranked.length}`);
 
