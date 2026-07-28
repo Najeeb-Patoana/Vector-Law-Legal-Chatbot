@@ -1,9 +1,5 @@
 const { pipeline } = require("@huggingface/transformers");
 
-// ── Module-level singleton ─────────────────────────────────────────────────────
-// The model is loaded once and reused for every request.
-// Keeping it at module scope means it survives across many HTTP requests
-// without ever being garbage-collected or re-downloaded.
 let _reranker = null;
 
 // ── Configuration ─────────────────────────────────────────────────────────────
@@ -13,9 +9,6 @@ const TOP_K    = 5;
 // ── initializeReranker ────────────────────────────────────────────────────────
 
 /**
- * Load the cross-encoder reranker model into memory.
- * Must be called once during server startup before any request is served.
- * Subsequent calls are instant (the singleton is already populated).
  *
  * @throws {Error} If the HuggingFace pipeline fails to load.
  */
@@ -51,7 +44,6 @@ async function initializeReranker() {
  * @returns {Promise<object[]>} Top-K documents with `rerankScore` attached, sorted desc.
  */
 async function rerank(question, documents) {
-    // ── Guard: reranker not loaded ─────────────────────────────────────────
     // This should never happen if initializeReranker() was called at startup,
     // but we handle it defensively to avoid a silent null-dereference crash.
     if (!_reranker) {

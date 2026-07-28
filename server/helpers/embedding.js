@@ -5,7 +5,6 @@ let extractorPromise = null;
 async function getExtractor() {
     if (!extractorPromise) {
         console.log("[Embedding] Loading local model into memory...");
-        // 'all-MiniLM-L6-v2' is the gold standard for fast, local semantic search (384 dimensions)
         extractorPromise = pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2', {
             dtype: 'q8' // 8-bit quantization: smaller RAM footprint, great accuracy
         });
