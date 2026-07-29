@@ -56,6 +56,7 @@ async function searchGlobalLegalContext(queryVector, limit = 50) {
     const results = await qdrant.search(COLLECTION, {
         vector: queryVector,
         limit,
+        score_threshold: 0.35, // drop chunks below 35% cosine similarity — reduces reranker noise
         with_payload: true,
     });
     return results.map((r) => ({ ...r.payload, _score: r.score }));

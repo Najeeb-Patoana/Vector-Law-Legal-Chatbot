@@ -1,7 +1,7 @@
 const jwt = require("jsonwebtoken");
 
 /**
- * Middleware: verify Bearer JWT.
+ * Middleware: require a valid Bearer JWT.
  * Attaches req.user = { userId, email, name } on success.
  */
 function requireAuth(req, res, next) {
@@ -21,4 +21,27 @@ function requireAuth(req, res, next) {
   }
 }
 
-module.exports = { requireAuth };
+/**
+ * Middleware: optionally verify a Bearer JWT.
+ * If the token is present and valid → req.user is set (authenticated).
+ * If absent or invalid → req.user stays null (guest). Never blocks the request.
+ */
+function optionalAuth(req, res, next) {
+  const header = req.headers["authorization"] || "";
+  const token  = header.startsWith("Bearer ") ? header.slice(7) : null;
+
+  req.user = null; // default: guest
+
+  if (token) {
+    try {
+      const payload = jwt.verify(token, process.env.JWT_SECRET);
+      req.user = { userId: payload.userId, email: payload.email, name: payload.name };
+    } catch {
+      // Invalid / expired token — treat as guest, do not block
+    }
+  }
+
+  next();
+}
+
+module.exports = { requireAuth, optionalAuth };

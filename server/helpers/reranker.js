@@ -4,7 +4,7 @@ let _reranker = null;
 
 // ── Configuration ─────────────────────────────────────────────────────────────
 const MODEL_ID = "jinaai/jina-reranker-v1-turbo-en";
-const TOP_K    = 5;
+const TOP_K    = 8;  // top candidates sent to the LLM after reranking
 
 // ── initializeReranker ────────────────────────────────────────────────────────
 
@@ -63,7 +63,13 @@ async function rerank(question, documents) {
 
     // Run inference over all pairs in a single batched call.
     // `top_k: null` tells the pipeline to return ALL scores (not just the top-1).
-    const scores = await _reranker(pairs, { top_k: null });
+    // 8-second timeout guards against a hung model blocking the request.
+    const scores = await Promise.race([
+        _reranker(pairs, { top_k: null }),
+        new Promise((_, reject) =>
+            setTimeout(() => reject(new Error("Reranker timed out after 8 s")), 8000)
+        ),
+    ]);
 
     // `scores` is an array of { label, score } objects in the same order as `pairs`.
     // The cross-encoder label is typically "LABEL_1" for relevant or a float score

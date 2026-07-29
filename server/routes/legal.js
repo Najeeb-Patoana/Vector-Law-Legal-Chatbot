@@ -1,6 +1,5 @@
 require("dotenv").config();
 const express   = require("express");
-const jwt       = require("jsonwebtoken");
 const rateLimit = require("express-rate-limit");
 
 const { createEmbedding }          = require("../helpers/embedding");
@@ -8,6 +7,7 @@ const { generate }                 = require("../helpers/llmManager");
 const { searchGlobalLegalContext } = require("../helpers/qdrant");
 const { rerank }                   = require("../helpers/reranker");
 const { pool }                     = require("../db");
+const { optionalAuth }             = require("../middleware/auth");
 
 const { SYSTEM_INSTRUCTION, buildRagPrompt } = require("../prompts/prompts");
 
@@ -33,9 +33,13 @@ const CASUAL_PATTERNS = [
     /^\s*(nice\s+to\s+meet\s+you|pleased\s+to\s+meet|who\s+are\s+you|what\s+is\s+your\s+name|what\s+can\s+you\s+do)/i,
 ];
 
+// Legal keywords — if any are present the message is NOT casual even with a greeting prefix
+const LEGAL_KEYWORDS = /\b(law|legal|court|statute|crime|penalty|felony|misdemeanor|judge|jury|defendant|plaintiff|constitution|amendment|rights|arrest|warrant|contract|liability|damages|attorney|lawsuit|civil|criminal|federal|supreme|appeal|verdict|sentence|parole|probation|bail|charge|indictment|prosecution|defense|evidence|testimony|jurisdiction|regulation|ordinance|code|act|bill|rights|section|title|usc|cfr)\b/i;
+
 function isCasualChat(text) {
     const trimmed = text.trim();
     if (trimmed.length > 120) return false;
+    if (LEGAL_KEYWORDS.test(trimmed)) return false; // has legal keywords → not casual
     return CASUAL_PATTERNS.some((re) => re.test(trimmed));
 }
 
@@ -48,11 +52,9 @@ function getClientIp(req) {
     return ip;
 }
 
-// UPDATED SANITIZE FUNCTION: Blocks XML/HTML prompt injection
 function sanitize(str, maxLen = 2000) {
     if (typeof str !== "string") return "";
     let clean = str.trim().slice(0, maxLen);
-    // Escape angle brackets to prevent escaping the XML prompt fence
     clean = clean.replace(/</g, "&lt;").replace(/>/g, "&gt;");
     return clean;
 }
@@ -85,56 +87,49 @@ router.get("/guest-status", async (req, res) => {
 });
 
 // ── POST /api/legal/ask ───────────────────────────────────────────────────────
-router.post("/ask", askLimiter, async (req, res) => {
+//  sets req.user if token is valid, otherwise req.user = null (guest)
+router.post("/ask", askLimiter, optionalAuth, async (req, res) => {
     try {
         const question = sanitize(req.body?.question, 1000);
         if (!question) return sendError(res, 400, "Question cannot be empty.");
 
         console.log(`[ASK] New query (${question.length} chars)`);
 
-        // ── Guest Limit Enforcement ────────────────────────────────────────
-        const authHeader = req.headers.authorization;
-        let isAuthenticated = false;
+        // ── Guest Limit Enforcement — single atomic round-trip ────────────────
         let currentGuestUsage = undefined;
 
-        if (authHeader && authHeader.startsWith("Bearer ")) {
-            const token = authHeader.split(" ")[1];
-            try {
-                jwt.verify(token, process.env.JWT_SECRET);
-                isAuthenticated = true;
-            } catch {
-                // Invalid token — treat as guest
-            }
-        }
-
-        if (!isAuthenticated) {
+        if (!req.user) {
             const ip = getClientIp(req);
             console.log(`[GUEST LIMIT] Client IP: "${ip}"`);
-            const limitResult = await pool.query(
-                "SELECT message_count FROM vl_guest_limits WHERE ip = $1",
-                [ip]
-            );
-            const count = limitResult.rows[0]?.message_count ?? 0;
 
-            if (count >= GUEST_LIMIT) {
-                return sendError(res, 403, "Free limit reached. Please sign in to continue.");
-            }
-
-            await pool.query(
+            // Atomic upsert + check: increments AND returns new count in one query.
+            // If the new count exceeds the limit we roll it back and reject.
+            const result = await pool.query(
                 `INSERT INTO vl_guest_limits (ip, message_count)
                  VALUES ($1, 1)
                  ON CONFLICT (ip) DO UPDATE
                    SET message_count = vl_guest_limits.message_count + 1,
-                       last_request  = NOW()`,
+                       last_request  = NOW()
+                 RETURNING message_count`,
                 [ip]
             );
-            currentGuestUsage = count + 1;
+            const newCount = result.rows[0].message_count;
+
+            if (newCount > GUEST_LIMIT) {
+                // Undo the increment so repeated rejections don't inflate the count
+                await pool.query(
+                    "UPDATE vl_guest_limits SET message_count = $1 WHERE ip = $2",
+                    [GUEST_LIMIT, ip]
+                );
+                return sendError(res, 403, "Free limit reached. Please sign in to continue.");
+            }
+
+            currentGuestUsage = newCount;
         }
 
-        // ── Intent 1: Casual chat ─────────────────────────────────────────
+        // ── Intent 1: Casual chat — skip vector search ────────────────────────
         if (isCasualChat(question)) {
             console.log("[ASK] Detected casual chat — skipping Qdrant.");
-            // Uses imported SYSTEM_INSTRUCTION
             const chatResponse = await generate(question, SYSTEM_INSTRUCTION, 0.7);
             return res.status(200).json({
                 success:    true,
@@ -144,7 +139,7 @@ router.post("/ask", askLimiter, async (req, res) => {
             });
         }
 
-        // ── Intent 2: Legal query ─────────────────────────────────────────
+        // ── Intent 2: Legal query — embed → search → rerank → generate ────────
         console.log("[ASK] Legal query — embedding…");
         const queryVector = await createEmbedding(question);
 
@@ -155,8 +150,8 @@ router.post("/ask", askLimiter, async (req, res) => {
         try {
             contextPayloads = await rerank(question, rawCandidates);
         } catch (rerankerErr) {
-            console.error("[ASK] Reranker failed, falling back to top-15:", rerankerErr.message);
-            contextPayloads = rawCandidates.slice(0, 15);
+            console.error("[ASK] Reranker failed, falling back to top-10:", rerankerErr.message);
+            contextPayloads = rawCandidates.slice(0, 10);
         }
 
         let contextBlock = "";
@@ -177,12 +172,9 @@ router.post("/ask", askLimiter, async (req, res) => {
                 .join("\n\n");
         }
 
-        // --- UPDATED PROMPT GENERATION ---
-        // Uses the external prompt builder function instead of inline strings
         const prompt = buildRagPrompt(contextBlock, question);
 
         console.log("[ASK] Generating answer…");
-        // Uses imported SYSTEM_INSTRUCTION
         const aiResponse = await generate(prompt, SYSTEM_INSTRUCTION, 0.1);
 
         console.log("[ASK] Done.");

@@ -125,7 +125,6 @@ export function ChatProvider({ children }) {
     setActiveSession((prev) =>
       prev?.session_id === session.session_id ? prev : session
     )
-    setMessages([]) // clear immediately; the effect above will populate
   }, [])
 
   // ── handleDeleteSession ────────────────────────────────────────────────────

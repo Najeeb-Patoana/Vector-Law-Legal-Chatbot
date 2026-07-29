@@ -24,7 +24,7 @@ async function generate(prompt, systemInstruction, temperature = 0.1) {
     const maxRetries = 2;
     const model = "llama-3.3-70b-versatile";
     const client = getClient();
-    
+
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
         try {
             const response = await client.chat.completions.create({
@@ -32,24 +32,23 @@ async function generate(prompt, systemInstruction, temperature = 0.1) {
                 temperature,
                 messages: [
                     { role: "system", content: systemInstruction },
-                    { role: "user", content: prompt }
+                    { role: "user",   content: prompt },
                 ],
             });
-            
+
             return {
                 success: true,
                 provider: "Groq",
                 model,
-                answer: response.choices[0].message.content
+                answer: response.choices[0].message.content,
             };
         } catch (err) {
             const status = err?.status ?? err?.response?.status ?? 500;
-            
             const isRecoverable = status === 429 || status >= 500;
-            
+
             if (isRecoverable && attempt < maxRetries) {
-                const delay = Math.pow(2, attempt + 1) * 1000; // 2s, 4s
-                console.log(`[LLM] Groq Rate limit/Server error (${status}) — retry ${attempt + 1}/${maxRetries} in ${delay / 1000}s`);
+                const delay = Math.pow(2, attempt + 1) * 1000;
+                console.log(`[LLM] Groq (${status}) — retry ${attempt + 1}/${maxRetries} in ${delay / 1000}s`);
                 await sleep(delay);
             } else {
                 const safeErr = new Error(`Groq API failed with status ${status}`);
