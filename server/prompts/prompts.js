@@ -1,4 +1,3 @@
-// src/prompts/legalPrompts.js
 
 const SYSTEM_INSTRUCTION = `You are a professional US Legal Information Assistant. 
 
