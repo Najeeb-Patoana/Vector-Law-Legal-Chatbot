@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from './AuthContext'
 import { askLegalQuestion, getGuestStatus } from '../services/api.js'
 import * as chatApi from '../services/authApi.js'
@@ -19,6 +19,11 @@ function makeMsg(role, text, extra = {}) {
 
 export function ChatProvider({ children }) {
   const { user, accessToken } = useAuth()
+
+  // ── In-memory message cache: { [session_id]: Message[] } ─────────────────
+  // Avoids re-fetching messages from the DB every time the user clicks a chat.
+  // Flushed on logout; updated in-place when new messages are sent.
+  const messageCache = useRef({})
 
   // ── Server-side data ───────────────────────────────────────────────────────
   const [sessions, setSessions] = useState([])
@@ -53,11 +58,12 @@ export function ChatProvider({ children }) {
       .catch(console.error)
   }, [user])
 
-  // ── Load sessions whenever the user logs in ────────────────────────────────
+  // ── Load sessions whenever the user logs in; flush cache on logout ──────────
   useEffect(() => {
     if (!accessToken) {
       setSessions([])
       setActiveSession(null)
+      messageCache.current = {} // flush all cached messages on logout
       return
     }
     setSessionsLoading(true)
@@ -68,29 +74,39 @@ export function ChatProvider({ children }) {
   }, [accessToken])
 
   // ── Load messages whenever the active session changes ─────────────────────
+  // Uses in-memory cache: DB is only hit once per session per login.
   useEffect(() => {
     if (!activeSession || !accessToken) {
       setMessages([])
       return
     }
 
-    let cancelled = false // cleanup flag to prevent race conditions
+    const sid = activeSession.session_id
 
-    chatApi.getMessages(activeSession.session_id)
+    // ── Cache hit: render immediately, skip the network call ──────────────
+    if (messageCache.current[sid]) {
+      setMessages(messageCache.current[sid])
+      return
+    }
+
+    // ── Cache miss: fetch from DB, then store in cache ────────────────────
+    let cancelled = false
+
+    chatApi.getMessages(sid)
       .then((data) => {
         if (cancelled) return
         if (data.success) {
-          setMessages(
-            data.messages.map((m) => ({
-              id: m.message_id,
-              role: m.role,
-              text: m.content,
-              time: new Date(m.created_at).toLocaleTimeString([], {
-                hour: '2-digit',
-                minute: '2-digit',
-              }),
-            }))
-          )
+          const mapped = data.messages.map((m) => ({
+            id: m.message_id,
+            role: m.role,
+            text: m.content,
+            time: new Date(m.created_at).toLocaleTimeString([], {
+              hour: '2-digit',
+              minute: '2-digit',
+            }),
+          }))
+          messageCache.current[sid] = mapped
+          setMessages(mapped)
         }
       })
       .catch((err) => { if (!cancelled) console.error(err) })
@@ -157,8 +173,13 @@ export function ChatProvider({ children }) {
       }
     }
 
-    // ── Optimistically append the user bubble ──────────────────────────────
-    setMessages((prev) => [...prev, makeMsg('user', trimmed)])
+    const userMsg = makeMsg('user', trimmed)
+    setMessages((prev) => {
+      const updated = [...prev, userMsg]
+      // keep cache in sync so switching away and back shows the optimistic msg
+      if (currentSession) messageCache.current[currentSession.session_id] = updated
+      return updated
+    })
     setIsLoading(true)
 
     // Persist user message (fire-and-forget)
@@ -179,7 +200,12 @@ export function ChatProvider({ children }) {
       }
 
       const assistantMsg = makeMsg('assistant', resData.answer)
-      setMessages((prev) => [...prev, assistantMsg])
+      setMessages((prev) => {
+        const updated = [...prev, assistantMsg]
+        // update cache with the assistant reply so re-visits stay fresh
+        if (currentSession) messageCache.current[currentSession.session_id] = updated
+        return updated
+      })
 
       // Persist assistant message (fire-and-forget)
       if (currentSession && accessToken) {
