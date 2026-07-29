@@ -3,17 +3,17 @@ const express   = require("express");
 const jwt       = require("jsonwebtoken");
 const rateLimit = require("express-rate-limit");
 
-const { createEmbedding }         = require("../helpers/embedding");
-const { generate }                = require("../helpers/llmManager");
+const { createEmbedding }          = require("../helpers/embedding");
+const { generate }                 = require("../helpers/llmManager");
 const { searchGlobalLegalContext } = require("../helpers/qdrant");
-const { rerank }                  = require("../helpers/reranker");
-const { pool }                    = require("../db");
+const { rerank }                   = require("../helpers/reranker");
+const { pool }                     = require("../db");
+
+const { SYSTEM_INSTRUCTION, buildRagPrompt } = require("../prompts/prompts");
 
 const router = express.Router();
 
 // ── Guest limit — single source of truth (server owns this value) ─────────────
-// The frontend reads it from the API response (guestLimit / limit fields) so
-// the hardcoded "4" only lives here, not duplicated in the client.
 const GUEST_LIMIT = parseInt(process.env.GUEST_LIMIT ?? "4", 10);
 
 // ── Rate limiter — for the /ask endpoint only ─────────────────────────────────
@@ -48,9 +48,13 @@ function getClientIp(req) {
     return ip;
 }
 
+// UPDATED SANITIZE FUNCTION: Blocks XML/HTML prompt injection
 function sanitize(str, maxLen = 2000) {
     if (typeof str !== "string") return "";
-    return str.trim().slice(0, maxLen);
+    let clean = str.trim().slice(0, maxLen);
+    // Escape angle brackets to prevent escaping the XML prompt fence
+    clean = clean.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    return clean;
 }
 
 function safeErrorMessage(err) {
@@ -63,20 +67,6 @@ function safeErrorMessage(err) {
 function sendError(res, status, publicMessage) {
     return res.status(status).json({ success: false, message: publicMessage });
 }
-
-// ── System Instruction (UPL Guardrails) ───────────────────────────────────────
-const systemInstruction = `You are a professional US Legal Information Assistant. 
-
-INTENT AND TONE:
-- For general legal questions, provide an objective, authoritative, and educational summary of the law using ONLY the provided context.
-- The UI already displays a permanent legal disclaimer, so DO NOT add your own legal disclaimers or state that you are an AI/not an attorney UNLESS the user is actively asking for advice on a specific personal situation, asking what action they should take, or asking you to predict a case outcome.
-
-CRITICAL BOUNDARIES:
-1. Provide objective legal INFORMATION only. NEVER provide tailored legal advice.
-2. Never tell the user what they "should", "must", or "need to" do regarding their personal circumstances.
-3. If the user asks for advice on a specific personal legal crisis or asks you to predict a specific court outcome, gracefully decline by stating that you cannot provide legal advice or strategy for specific situations.
-4. Always cite your matching context source citations inline when outputting legal details.
-5. Absolute Factual Grounding: If the retrieved database context lacks clear evidence to answer the user's question, state plainly that you cannot locate sufficient supporting documentation in the indexed dataset. Do NOT rely on your general training data to make up laws, rules, or citations.`;
 
 // ── GET /api/legal/guest-status ───────────────────────────────────────────────
 router.get("/guest-status", async (req, res) => {
@@ -95,11 +85,6 @@ router.get("/guest-status", async (req, res) => {
 });
 
 // ── POST /api/legal/ask ───────────────────────────────────────────────────────
-//
-// Dual-intent routing:
-//   1. Casual chat → direct LLM response (no Qdrant lookup)
-//   2. Legal query → embed → Qdrant search → rerank → contextual LLM response
-//
 router.post("/ask", askLimiter, async (req, res) => {
     try {
         const question = sanitize(req.body?.question, 1000);
@@ -149,7 +134,8 @@ router.post("/ask", askLimiter, async (req, res) => {
         // ── Intent 1: Casual chat ─────────────────────────────────────────
         if (isCasualChat(question)) {
             console.log("[ASK] Detected casual chat — skipping Qdrant.");
-            const chatResponse = await generate(question, systemInstruction, 0.7);
+            // Uses imported SYSTEM_INSTRUCTION
+            const chatResponse = await generate(question, SYSTEM_INSTRUCTION, 0.7);
             return res.status(200).json({
                 success:    true,
                 answer:     chatResponse.answer,
@@ -191,12 +177,13 @@ router.post("/ask", askLimiter, async (req, res) => {
                 .join("\n\n");
         }
 
-        const prompt = contextBlock
-            ? `The following legal context was retrieved from an authoritative indexed database. Use ONLY this context to answer the user's question. Cite the [Citation] values inline.\n\n${contextBlock}\n\n---\nUser Question: ${question}`
-            : `No matching legal context was found in the indexed database for this query.\n\nUser Question: ${question}`;
+        // --- UPDATED PROMPT GENERATION ---
+        // Uses the external prompt builder function instead of inline strings
+        const prompt = buildRagPrompt(contextBlock, question);
 
         console.log("[ASK] Generating answer…");
-        const aiResponse = await generate(prompt, systemInstruction, 0.1);
+        // Uses imported SYSTEM_INSTRUCTION
+        const aiResponse = await generate(prompt, SYSTEM_INSTRUCTION, 0.1);
 
         console.log("[ASK] Done.");
         return res.status(200).json({
