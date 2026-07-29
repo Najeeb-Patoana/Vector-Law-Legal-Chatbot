@@ -1,4 +1,4 @@
-<!-- # Vector Law — AI-Powered US Legal Research Assistant
+# Vector Law — AI-Powered US Legal Research Assistant
 
 <p align="center">
   <img src="https://img.shields.io/badge/Node.js-Express-green?logo=node.js" />
@@ -417,4 +417,4 @@ Response:
 | `GET` | `/api/chat/sessions/:id/messages` | Load messages for a session |
 | `POST` | `/api/chat/sessions/:id/messages` | Save a message to a session |
 
---- -->
+---
