@@ -1,3 +1,4 @@
+// routes/legal.js
 require("dotenv").config();
 const express   = require("express");
 const rateLimit = require("express-rate-limit");
@@ -8,6 +9,7 @@ const { searchGlobalLegalContext } = require("../helpers/qdrant");
 const { rerank }                   = require("../helpers/reranker");
 const { pool }                     = require("../db");
 const { optionalAuth }             = require("../middleware/auth");
+const { isCasual }                 = require("../helpers/chatFilter"); // <-- Added this
 
 const { SYSTEM_INSTRUCTION, buildRagPrompt } = require("../prompts/prompts");
 
@@ -24,24 +26,6 @@ const askLimiter = rateLimit({
     legacyHeaders: false,
     message: { success: false, message: "Too many questions. Please slow down." },
 });
-
-// ── Intent Detection ──────────────────────────────────────────────────────────
-const CASUAL_PATTERNS = [
-    /^\s*(h(i|ello|ey|owdy)|good\s*(morning|afternoon|evening|night)|what'?\s*s?\s*up|yo|sup|greetings)/i,
-    /^\s*(how\s+are\s+you|how'?\s*s?\s*it\s+going|how\s+do\s+you\s+do|what'?\s*s?\s*good)/i,
-    /^\s*(thanks?|thank\s+you|thx|ty|bye|goodbye|see\s+you|take\s+care|have\s+a\s+(good|nice|great)\s+(day|one|evening))/i,
-    /^\s*(nice\s+to\s+meet\s+you|pleased\s+to\s+meet|who\s+are\s+you|what\s+is\s+your\s+name|what\s+can\s+you\s+do)/i,
-];
-
-// Legal keywords — if any are present the message is NOT casual even with a greeting prefix
-const LEGAL_KEYWORDS = /\b(law|legal|court|statute|crime|penalty|felony|misdemeanor|judge|jury|defendant|plaintiff|constitution|amendment|rights|arrest|warrant|contract|liability|damages|attorney|lawsuit|civil|criminal|federal|supreme|appeal|verdict|sentence|parole|probation|bail|charge|indictment|prosecution|defense|evidence|testimony|jurisdiction|regulation|ordinance|code|act|bill|rights|section|title|usc|cfr)\b/i;
-
-function isCasualChat(text) {
-    const trimmed = text.trim();
-    if (trimmed.length > 120) return false;
-    if (LEGAL_KEYWORDS.test(trimmed)) return false; // has legal keywords → not casual
-    return CASUAL_PATTERNS.some((re) => re.test(trimmed));
-}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -87,7 +71,6 @@ router.get("/guest-status", async (req, res) => {
 });
 
 // ── POST /api/legal/ask ───────────────────────────────────────────────────────
-//  sets req.user if token is valid, otherwise req.user = null (guest)
 router.post("/ask", askLimiter, optionalAuth, async (req, res) => {
     try {
         const question = sanitize(req.body?.question, 1000);
@@ -102,8 +85,6 @@ router.post("/ask", askLimiter, optionalAuth, async (req, res) => {
             const ip = getClientIp(req);
             console.log(`[GUEST LIMIT] Client IP: "${ip}"`);
 
-            // Atomic upsert + check: increments AND returns new count in one query.
-            // If the new count exceeds the limit we roll it back and reject.
             const result = await pool.query(
                 `INSERT INTO vl_guest_limits (ip, message_count)
                  VALUES ($1, 1)
@@ -116,7 +97,6 @@ router.post("/ask", askLimiter, optionalAuth, async (req, res) => {
             const newCount = result.rows[0].message_count;
 
             if (newCount > GUEST_LIMIT) {
-                // Undo the increment so repeated rejections don't inflate the count
                 await pool.query(
                     "UPDATE vl_guest_limits SET message_count = $1 WHERE ip = $2",
                     [GUEST_LIMIT, ip]
@@ -127,9 +107,13 @@ router.post("/ask", askLimiter, optionalAuth, async (req, res) => {
             currentGuestUsage = newCount;
         }
 
-        // ── Intent 1: Casual chat — skip vector search ────────────────────────
-        if (isCasualChat(question)) {
-            console.log("[ASK] Detected casual chat — skipping Qdrant.");
+        // ── Intent 1: Local Semantic Chat Filter ──────────────────────────────
+        // Shortcut: If it's over 120 chars, it's definitely not a simple hello.
+        const isLengthy = question.length > 120;
+        const isCasualGreeting = !isLengthy && (await isCasual(question));
+
+        if (isCasualGreeting) {
+            console.log("[ASK] Semantic filter flagged casual chat — skipping Qdrant.");
             const chatResponse = await generate(question, SYSTEM_INSTRUCTION, 0.7);
             return res.status(200).json({
                 success:    true,

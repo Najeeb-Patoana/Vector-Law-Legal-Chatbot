@@ -9,6 +9,7 @@ const rateLimit = require("express-rate-limit");
 const { initDB, scheduleVerificationCleanup } = require("./db");
 const { initializeQdrant }   = require("./helpers/qdrant");
 const { initializeReranker } = require("./helpers/reranker");
+const { initFilterModel }          = require("./helpers/chatFilter"); 
 
 // ── Route modules ─────────────────────────────────────────────────────────────
 const authRouter  = require("./routes/auth");
@@ -96,6 +97,11 @@ async function start() {
     } catch (err) {
         console.warn("[Server] Reranker unavailable:", err.message);
         console.warn("[Server] Will fall back to top-15 vector results on each request.");
+    }
+    try {
+        await initFilterModel();
+    } catch (err) {
+        console.warn("[Server] Chat filter model unavailable at startup:", err.message);
     }
 
     app.listen(PORT, () => {
