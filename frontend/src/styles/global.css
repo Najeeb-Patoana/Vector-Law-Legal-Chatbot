@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Lora:wght@400;500;600&display=swap');
+
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
@@ -5,66 +7,67 @@
 }
 
 :root {
-  /* Brand — Teal */
-  --color-primary:       #0f766e;
-  --color-primary-hover: #0d6e66;
-  --color-primary-light: #f0fdfa;
-  --color-secondary:     #0d9488;
-  --color-accent:        #059669;
+  /* ── Brand — Black / Charcoal ──────────────────────────── */
+  --color-primary:        #111111;
+  --color-primary-hover:  #2a2a2a;
+  --color-primary-light:  #f2f2f2;
+  --color-primary-mid:    #444444;
 
-  /* Light Surfaces */
-  --color-bg:      #f8fafc;
-  --color-surface: #ffffff;
-  --color-border:  #e2e8f0;
-  --color-border-focus: #0f766e;
+  /* ── Surfaces ──────────────────────────────────────────── */
+  --color-bg:       #f7f8fc;
+  --color-surface:  #ffffff;
+  --color-surface-2: #f0f2fa;
+  --color-border:   #e4e6ef;
+  --color-border-focus: #3b4bdb;
 
-  /* Text */
-  --color-text:       #0f172a;
-  --color-text-muted: #475569;
-  --color-text-light: #94a3b8;
+  /* ── Text ──────────────────────────────────────────────── */
+  --color-text:       #1a1d2e;
+  --color-text-muted: #52556e;
+  --color-text-light: #9496ae;
 
-  /* State */
-  --color-success:        #059669;
-  --color-success-light:  #ecfdf5;
-  --color-success-border: #a7f3d0;
-  --color-error:          #ef4444;
-  --color-error-light:    #fef2f2;
-  --color-error-border:   #fecaca;
-  --color-warning:        #f59e0b;
+  /* ── State colors ──────────────────────────────────────── */
+  --color-success:        #1a7f5a;
+  --color-success-light:  #f0faf5;
+  --color-success-border: #b0dece;
+  --color-error:          #c0392b;
+  --color-error-light:    #fdf2f2;
+  --color-error-border:   #f5c0bc;
+  --color-warning:        #b45309;
   --color-warning-light:  #fffbeb;
 
-  /* Chat bubbles */
-  --color-user-bubble:  #0f766e;
+  /* ── Chat bubbles ───────────────────────────────────────── */
+  --color-user-bubble:  #3b4bdb;
   --color-user-text:    #ffffff;
   --color-bot-bubble:   #ffffff;
-  --color-bot-text:     #0f172a;
+  --color-bot-text:     #1a1d2e;
 
-  /* Typography */
-  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-heading: 'Outfit', 'Inter', -apple-system, sans-serif;
+  /* ── Typography ─────────────────────────────────────────── */
+  --font-family:  'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-heading: 'Lora', 'Inter', -apple-system, serif;
 
-  /* Spacing */
+  /* ── Spacing ────────────────────────────────────────────── */
   --space-xs: 4px;  --space-sm: 8px;  --space-md: 16px;
   --space-lg: 24px; --space-xl: 32px; --space-2xl: 48px; --space-3xl: 64px;
 
-  /* Radius */
-  --radius-sm: 6px; --radius-md: 10px; --radius-lg: 14px;
-  --radius-xl: 20px; --radius-full: 9999px;
+  /* ── Radius ─────────────────────────────────────────────── */
+  --radius-sm: 5px; --radius-md: 8px; --radius-lg: 12px;
+  --radius-xl: 18px; --radius-full: 9999px;
 
-  /* Shadows */
-  --shadow-sm:    0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
-  --shadow-md:    0 4px 16px rgba(0,0,0,0.07), 0 2px 6px rgba(0,0,0,0.04);
-  --shadow-lg:    0 10px 40px rgba(0,0,0,0.09), 0 4px 12px rgba(0,0,0,0.05);
-  --shadow-focus: 0 0 0 3px rgba(15, 118, 110, 0.15);
+  /* ── Shadows ────────────────────────────────────────────── */
+  --shadow-xs:    0 1px 2px rgba(26,29,46,0.05);
+  --shadow-sm:    0 1px 4px rgba(26,29,46,0.06), 0 1px 2px rgba(26,29,46,0.04);
+  --shadow-md:    0 4px 16px rgba(26,29,46,0.07), 0 2px 6px rgba(26,29,46,0.04);
+  --shadow-lg:    0 10px 40px rgba(26,29,46,0.09), 0 4px 12px rgba(26,29,46,0.05);
+  --shadow-focus: 0 0 0 3px rgba(0, 0, 0, 0.12);
 
-  /* Transitions */
-  --transition-fast: 150ms ease;
+  /* ── Transitions ────────────────────────────────────────── */
+  --transition-fast: 140ms ease;
   --transition-base: 200ms ease;
   --transition-slow: 300ms ease;
 
-  /* Layout */
-  --max-width:   1200px;
-  --nav-height:  64px;
+  /* ── Layout ─────────────────────────────────────────────── */
+  --max-width:    1200px;
+  --nav-height:   60px;
   --input-height: 80px;
 }
 
@@ -86,9 +89,7 @@ body {
   min-height: 100vh;
 }
 
-/* ============================================
-   TYPOGRAPHY
-   ============================================ */
+/* ── Typography ─────────────────────────────────────────────── */
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-heading);
   line-height: 1.3;
@@ -98,25 +99,23 @@ h1, h2, h3, h4, h5, h6 {
 
 p { color: var(--color-text-muted); line-height: 1.7; }
 
-/* ============================================
-   ANIMATIONS
-   ============================================ */
+/* ── Animations ─────────────────────────────────────────────── */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(12px); }
+  from { opacity: 0; transform: translateY(10px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 @keyframes fadeInScale {
-  from { opacity: 0; transform: scale(0.97); }
+  from { opacity: 0; transform: scale(0.98); }
   to   { opacity: 1; transform: scale(1); }
 }
 @keyframes spin    { to { transform: rotate(360deg); } }
-@keyframes pulse   { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+@keyframes pulse   { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
 @keyframes slideDown {
   from { opacity: 0; transform: translateY(-8px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 @keyframes slideUp {
-  from { opacity: 0; transform: translateY(16px); }
+  from { opacity: 0; transform: translateY(14px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 @keyframes typingDot {
@@ -126,22 +125,18 @@ p { color: var(--color-text-muted); line-height: 1.7; }
 
 .animate-fade-in       { animation: fadeIn var(--transition-slow) ease both; }
 .animate-fade-in-scale { animation: fadeInScale var(--transition-slow) ease both; }
-.animate-slide-up      { animation: slideUp 0.35s ease both; }
+.animate-slide-up      { animation: slideUp 0.32s ease both; }
 
-/* ============================================
-   SCROLLBAR
-   ============================================ */
-::-webkit-scrollbar       { width: 6px; }
-::-webkit-scrollbar-track { background: var(--color-bg); }
+/* ── Scrollbar ───────────────────────────────────────────────── */
+::-webkit-scrollbar       { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: var(--color-border);
+  background: #d1d5e8;
   border-radius: var(--radius-full);
 }
-::-webkit-scrollbar-thumb:hover { background: var(--color-text-light); }
+::-webkit-scrollbar-thumb:hover { background: #b0b5d4; }
 
-/* ============================================
-   LAYOUT HELPERS
-   ============================================ */
+/* ── Layout Helpers ─────────────────────────────────────────── */
 .container {
   width: 100%;
   max-width: var(--max-width);

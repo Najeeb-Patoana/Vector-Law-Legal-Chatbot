@@ -1,19 +1,19 @@
-/* ── Sidebar — Light Theme ───────────────────────────────────────────────────*/
+/* ── Sidebar — Professional Light ────────────────────────────────────────────*/
 
 .sidebar {
-  width: 260px;
+  width: 256px;
   flex-shrink: 0;
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: #f1f5f9;
+  background: var(--color-surface);
   border-right: 1px solid var(--color-border);
   overflow: hidden;
   transition: width 0.25s ease;
 }
 
 .sidebarTop {
-  padding: 16px 12px 12px;
+  padding: 14px 10px 12px;
   border-bottom: 1px solid var(--color-border);
 }
 
@@ -21,53 +21,50 @@
   width: 100%;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  background: #ffffff;
-  border: 1.5px solid var(--color-border);
-  border-radius: 10px;
+  gap: 9px;
+  padding: 9px 14px;
+  background: var(--color-primary-light);
+  border: 1.5px solid #d8d8d8;
+  border-radius: var(--radius-md);
   color: var(--color-primary);
-  font-size: 0.87rem;
+  font-size: 0.84rem;
   font-weight: 600;
   font-family: var(--font-family);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.18s ease;
   text-align: left;
-  box-shadow: var(--shadow-sm);
 }
 
 .newChatBtn:hover {
+  background: #e8e8e8;
   border-color: var(--color-primary);
-  background: var(--color-primary-light);
-  box-shadow: 0 2px 8px rgba(15, 118, 110, 0.12);
   transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
 }
 
-.newChatBtn:active {
-  transform: translateY(0);
-}
+.newChatBtn:active { transform: translateY(0); }
 
-/* section label */
+/* ── Section Label ───────────────────────────────────────────────────────── */
 .sectionLabel {
-  padding: 16px 16px 6px;
-  font-size: 0.68rem;
+  padding: 14px 14px 5px;
+  font-size: 0.65rem;
   font-weight: 700;
   color: var(--color-text-light);
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
-/* session list */
+/* ── Session List ────────────────────────────────────────────────────────── */
 .sessionList {
   flex: 1;
   overflow-y: auto;
   padding: 4px 8px 8px;
 }
 
-.sessionList::-webkit-scrollbar { width: 4px; }
+.sessionList::-webkit-scrollbar { width: 3px; }
 .sessionList::-webkit-scrollbar-track { background: transparent; }
 .sessionList::-webkit-scrollbar-thumb {
-  background: var(--color-border);
+  background: #d1d5e8;
   border-radius: 4px;
 }
 
@@ -75,26 +72,25 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 9px 10px;
-  border-radius: 8px;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.14s ease;
   position: relative;
 }
 
 .sessionItem:hover {
-  background: #e2e8f0;
+  background: var(--color-bg);
 }
 
 .sessionItem.active {
-  background: #e0f2fe;
-  border: 1px solid rgba(15, 118, 110, 0.15);
+  background: var(--color-primary-light);
 }
 
 .sessionIcon {
   color: var(--color-text-light);
   flex-shrink: 0;
-  transition: color 0.15s;
+  transition: color 0.14s;
 }
 
 .sessionItem.active .sessionIcon,
@@ -104,16 +100,16 @@
 
 .sessionTitle {
   flex: 1;
-  font-size: 0.82rem;
+  font-size: 0.81rem;
   color: var(--color-text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  transition: color 0.15s;
+  transition: color 0.14s;
 }
 
 .sessionItem.active .sessionTitle {
-  color: var(--color-text);
+  color: var(--color-primary);
   font-weight: 500;
 }
 
@@ -123,9 +119,9 @@
 
 .deleteBtn {
   flex-shrink: 0;
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
   border: none;
   background: transparent;
   color: var(--color-text-light);
@@ -134,53 +130,51 @@
   justify-content: center;
   cursor: pointer;
   opacity: 0;
-  transition: all 0.15s ease;
+  transition: all 0.14s ease;
 }
 
-.sessionItem:hover .deleteBtn {
-  opacity: 1;
-}
+.sessionItem:hover .deleteBtn { opacity: 1; }
 
 .deleteBtn:hover {
-  background: #fee2e2;
-  color: #ef4444;
+  background: var(--color-error-light);
+  color: var(--color-error);
 }
 
-/* sidebar footer — user info */
+/* ── Sidebar Footer ──────────────────────────────────────────────────────── */
 .sidebarFooter {
-  padding: 12px;
+  padding: 10px;
   border-top: 1px solid var(--color-border);
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  background: #ffffff;
+  gap: 6px;
+  background: var(--color-bg);
 }
 
 .userInfo {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 4px;
+  gap: 9px;
+  padding: 6px 4px;
 }
 
 .userAvatar {
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #0f766e, #059669);
+  background: var(--color-primary);
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   font-weight: 700;
   flex-shrink: 0;
-  letter-spacing: 0.05em;
-  box-shadow: 0 2px 6px rgba(15, 118, 110, 0.25);
+  letter-spacing: 0.04em;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
 }
 
 .userName {
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   font-weight: 600;
   color: var(--color-text);
   flex: 1;
@@ -190,7 +184,7 @@
 }
 
 .userEmail {
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   color: var(--color-text-light);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -201,34 +195,34 @@
   width: 100%;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
+  gap: 7px;
+  padding: 7px 10px;
   background: transparent;
   border: 1px solid var(--color-border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   color: var(--color-text-muted);
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   font-family: var(--font-family);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.14s ease;
 }
 
 .logoutBtn:hover {
-  border-color: #fecaca;
-  color: #ef4444;
-  background: #fef2f2;
+  border-color: var(--color-error-border);
+  color: var(--color-error);
+  background: var(--color-error-light);
 }
 
-/* empty sessions state */
+/* ── Empty Sessions ──────────────────────────────────────────────────────── */
 .noSessions {
-  padding: 24px 16px;
+  padding: 22px 14px;
   text-align: center;
   color: var(--color-text-light);
-  font-size: 0.8rem;
-  line-height: 1.6;
+  font-size: 0.78rem;
+  line-height: 1.65;
 }
 
-/* mobile */
+/* ── Mobile ──────────────────────────────────────────────────────────────── */
 @media (max-width: 768px) {
   .sidebar { width: 220px; }
 }
@@ -241,7 +235,7 @@
     bottom: 0;
     z-index: 50;
     width: 240px;
-    box-shadow: 4px 0 24px rgba(0,0,0,0.12);
+    box-shadow: 4px 0 24px rgba(26,29,46,0.1);
   }
 
   .sidebarHidden {
