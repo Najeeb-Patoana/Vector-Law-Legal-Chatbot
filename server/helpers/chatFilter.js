@@ -40,7 +40,7 @@ async function isCasual(text) {
     }
 
     // ── 2. THE ML PATH ────────────────────────────────────────────────────────
-    // We tweaked the labels so "questions" doesn't confuse the AI anymore
+    // We tweaked the labels so "questions" doesn't confuse the AI
     const labels = [
         "casual small talk, conversational greetings, or pleasantries", 
         "specific legal inquiries or statutory issues"
