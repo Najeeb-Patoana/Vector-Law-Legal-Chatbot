@@ -25,6 +25,7 @@ export default function ChatDashboard() {
   const [sidebarOpen,    setSidebarOpen]    = useState(true)
   const [showLimitModal, setShowLimitModal] = useState(false)
   const [copiedId,       setCopiedId]       = useState(null)
+  const [deleteConfirm,  setDeleteConfirm]  = useState(null) // { sessionId, title }
 
   // ── DOM refs ───────────────────────────────────────────────────────────────
   const messagesEndRef = useRef(null)
@@ -80,9 +81,16 @@ export default function ChatDashboard() {
   }
 
   // ── Wrappers that keep stopPropagation in the UI layer ─────────────────────
-  const onDeleteSession = (e, sessionId) => {
+  const onDeleteSession = (e, sessionId, title) => {
     e.stopPropagation()
-    handleDeleteSession(sessionId)
+    setDeleteConfirm({ sessionId, title })
+  }
+
+  const confirmDelete = () => {
+    if (deleteConfirm) {
+      handleDeleteSession(deleteConfirm.sessionId)
+      setDeleteConfirm(null)
+    }
   }
 
   // ── Render helpers ─────────────────────────────────────────────────────────
@@ -169,7 +177,7 @@ export default function ChatDashboard() {
                   </span>
                   <button
                     className={sidebarStyles.deleteBtn}
-                    onClick={(e) => onDeleteSession(e, session.session_id)}
+                    onClick={(e) => onDeleteSession(e, session.session_id, session.title)}
                     aria-label={`Delete ${session.title}`}
                   >
                     <FiTrash2 size={12} />
@@ -387,6 +395,36 @@ export default function ChatDashboard() {
             <button className={styles.modalClose} onClick={() => setShowLimitModal(false)}>
               Maybe later
             </button>
+          </div>
+        </div>
+      )}
+      {deleteConfirm && (
+        <div className={styles.confirmOverlay} onClick={() => setDeleteConfirm(null)}>
+          <div className={styles.confirmDialog} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.confirmIconWrap}>
+              <FiTrash2 size={26} />
+            </div>
+            <h3 className={styles.confirmTitle}>Delete Chat?</h3>
+            <p className={styles.confirmMsg}>
+              <span className={styles.confirmChatName}>&ldquo;{deleteConfirm.title}&rdquo;</span>
+              {' '}will be permanently deleted. This cannot be undone.
+            </p>
+            <div className={styles.confirmActions}>
+              <button
+                className={styles.confirmCancel}
+                onClick={() => setDeleteConfirm(null)}
+                id="confirm-cancel-btn"
+              >
+                Cancel
+              </button>
+              <button
+                className={styles.confirmDelete}
+                onClick={confirmDelete}
+                id="confirm-delete-btn"
+              >
+                <FiTrash2 size={14} /> Delete
+              </button>
+            </div>
           </div>
         </div>
       )}
