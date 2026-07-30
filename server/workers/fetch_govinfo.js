@@ -581,7 +581,7 @@
 
 
 /**
- * GovInfo USCODE Ingestion Worker (ULTIMATE ASYNC VERSION)
+ * GovInfo USCODE Ingestion Worker 
  * ───────────────────────────────────────────────────────────────────
  * Features: Background detached uploader, non-blocking CPU pipelines,
  * concurrent fetching, and real-time metrics.
