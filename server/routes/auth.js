@@ -10,6 +10,32 @@ const { pool, cleanupExpiredVerifications } = require("../db");
 const router       = express.Router();
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
+// ── Validation helpers ────────────────────────────────────────────────────────
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const NAME_RE  = /^[a-zA-Z\s'-]{2,60}$/;
+
+function validateEmail(email) {
+  if (!email || typeof email !== "string") return "Email is required.";
+  if (!EMAIL_RE.test(email.trim()))         return "Please enter a valid email address.";
+  return null;
+}
+
+function validatePassword(password, isNew = true) {
+  if (!password || typeof password !== "string") return "Password is required.";
+  if (isNew && password.length < 8)              return "Password must be at least 8 characters.";
+  if (isNew && password.length > 72)             return "Password must not exceed 72 characters.";
+  return null;
+}
+
+function validateName(name) {
+  if (!name || typeof name !== "string") return "Full name is required.";
+  const trimmed = name.trim();
+  if (trimmed.length < 2)               return "Name must be at least 2 characters.";
+  if (trimmed.length > 60)              return "Name must not exceed 60 characters.";
+  if (!NAME_RE.test(trimmed))           return "Name may only contain letters, spaces, hyphens, and apostrophes.";
+  return null;
+}
+
 // ── SMTP transporter ──────────────────────────────────────────────────────────
 const transporter = nodemailer.createTransport({
   host:   process.env.SMTP_HOST,
@@ -43,27 +69,39 @@ router.post("/register", async (req, res) => {
   try {
     const { email, password, name } = req.body;
 
-    if (!email || !password || !name) {
-      return res.status(400).json({ success: false, message: "Name, email, and password are required." });
-    }
-    if (password.length < 8) {
-      return res.status(400).json({ success: false, message: "Password must be at least 8 characters." });
+    // Validate all fields and collect errors
+    const errors = {};
+    const nameErr  = validateName(name);
+    const emailErr = validateEmail(email);
+    const passErr  = validatePassword(password, true);
+    if (nameErr)  errors.name     = nameErr;
+    if (emailErr) errors.email    = emailErr;
+    if (passErr)  errors.password = passErr;
+
+    if (Object.keys(errors).length) {
+      return res.status(400).json({ success: false, message: "Validation failed.", errors });
     }
 
-    const existing = await pool.query("SELECT user_id FROM vl_users WHERE email = $1", [email]);
+    const normEmail = email.trim().toLowerCase();
+
+    const existing = await pool.query("SELECT user_id FROM vl_users WHERE email = $1", [normEmail]);
     if (existing.rows.length) {
-      return res.status(409).json({ success: false, message: "An account with this email already exists." });
+      return res.status(409).json({
+        success: false,
+        message: "An account with this email already exists.",
+        errors:  { email: "An account with this email already exists." },
+      });
     }
 
-    const hash = await bcrypt.hash(password, 12);
+    const hash   = await bcrypt.hash(password, 12);
     const result = await pool.query(
       "INSERT INTO vl_users (email, name, password_hash) VALUES ($1, $2, $3) RETURNING *",
-      [email.toLowerCase().trim(), name.trim(), hash]
+      [normEmail, name.trim(), hash]
     );
     const user = result.rows[0];
 
     // Create verification token
-    const token = crypto.randomBytes(32).toString("hex");
+    const token   = crypto.randomBytes(32).toString("hex");
     const expires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
     await pool.query(
       "INSERT INTO vl_email_verifications (user_id, token, expires_at) VALUES ($1, $2, $3)",
@@ -173,11 +211,18 @@ router.get("/verify-email", async (req, res) => {
 router.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
-    if (!email || !password) {
-      return res.status(400).json({ success: false, message: "Email and password are required." });
+
+    const errors = {};
+    const emailErr = validateEmail(email);
+    const passErr  = validatePassword(password, false);
+    if (emailErr) errors.email    = emailErr;
+    if (passErr)  errors.password = passErr;
+
+    if (Object.keys(errors).length) {
+      return res.status(400).json({ success: false, message: "Validation failed.", errors });
     }
 
-    const result = await pool.query("SELECT * FROM vl_users WHERE email = $1", [email.toLowerCase().trim()]);
+    const result = await pool.query("SELECT * FROM vl_users WHERE email = $1", [email.trim().toLowerCase()]);
     const user   = result.rows[0];
 
     if (!user || !user.password_hash) {

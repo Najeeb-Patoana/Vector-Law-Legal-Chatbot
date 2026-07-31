@@ -30,7 +30,7 @@ API.interceptors.response.use(
     const serverMessage = error?.response?.data?.message;
     if (serverMessage) {
       const friendlyError = new Error(serverMessage);
-      // Preserve any extra fields (e.g. needsVerification)
+      // Preserve any extra fields (e.g. needsVerification, errors)
       Object.assign(friendlyError, error.response.data);
       return Promise.reject(friendlyError);
     }
