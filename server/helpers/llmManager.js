@@ -27,15 +27,14 @@ async function generate(prompt, systemInstruction, temperature = 0.1) {
             return response;
         } catch (error) {
             lastError = error;
-            console.log(`[LLM] ${provider.name} failed (${error.status || "unknown"})`);
+            console.log(`[LLM] ${provider.name} failed (${error.status || "unknown"}): ${error.message}`);
 
-            if (error.isRecoverable === false) {
-                console.log(`[LLM] ${provider.name} error is not recoverable, aborting fallback.`);
-                throw error;
-            }
-
+            // isRecoverable === false means this provider can't be retried internally,
+            // but we still fall through to the next provider in the chain.
             const isLast = provider.name === providers[providers.length - 1].name;
-            if (!isLast) console.log("[LLM] Falling back to next provider…");
+            if (!isLast) {
+                console.log(`[LLM] Falling back to next provider…`);
+            }
         }
     }
 
