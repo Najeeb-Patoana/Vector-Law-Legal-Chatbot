@@ -1,51 +1,31 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { GoogleLogin } from '@react-oauth/google'
+import { useForm } from 'react-hook-form'
 import { useAuth } from '../context/AuthContext'
 import { FiShield, FiAlertCircle, FiCheckCircle } from 'react-icons/fi'
 import styles from '../styles/Auth.module.css'
 
-// ── Client-side validators ────────────────────────────────────────────────────
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
-
-function validateEmail(v) {
-  if (!v?.trim())               return 'Email is required.'
-  if (!EMAIL_RE.test(v.trim())) return 'Please enter a valid email address (e.g. you@example.com).'
-  return ''
-}
-
-function validatePassword(v) {
-  if (!v) return 'Password is required.'
-  return ''
-}
 
 export default function LoginPage() {
   const { login, loginWithGoogle } = useAuth()
   const navigate = useNavigate()
 
-  const [email, setEmail]       = useState('')
-  const [password, setPassword] = useState('')
-  const [loading, setLoading]   = useState(false)
-
-  // Per-field errors
-  const [fieldErrors, setFieldErrors] = useState({ email: '', password: '' })
-  // Banner: general errors or info (e.g. needs verification)
+  const [loading, setLoading]         = useState(false)
   const [bannerError, setBannerError] = useState('')
   const [info, setInfo]               = useState('')
 
-  const setFieldError = (field, msg) =>
-    setFieldErrors((prev) => ({ ...prev, [field]: msg }))
+  const {
+    register,
+    handleSubmit,
+    setError,
+    formState: { errors },
+  } = useForm({ mode: 'onTouched' })
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
+  const onSubmit = async ({ email, password }) => {
     setBannerError('')
     setInfo('')
-
-    const emailErr = validateEmail(email)
-    const passErr  = validatePassword(password)
-    setFieldErrors({ email: emailErr, password: passErr })
-    if (emailErr || passErr) return
-
     setLoading(true)
     try {
       await login(email.trim(), password)
@@ -54,11 +34,8 @@ export default function LoginPage() {
       if (err.needsVerification || err.message?.toLowerCase().includes('verify')) {
         setInfo(err.message)
       } else if (err.errors) {
-        setFieldErrors((prev) => ({
-          ...prev,
-          email:    err.errors.email    || prev.email,
-          password: err.errors.password || prev.password,
-        }))
+        if (err.errors.email)    setError('email',    { message: err.errors.email })
+        if (err.errors.password) setError('password', { message: err.errors.password })
       } else {
         setBannerError(err.message || 'Login failed. Please try again.')
       }
@@ -107,27 +84,28 @@ export default function LoginPage() {
           </div>
         )}
 
-        <form className={styles.form} onSubmit={handleSubmit} noValidate>
+        <form className={styles.form} onSubmit={handleSubmit(onSubmit)} noValidate>
           {/* Email */}
           <div className={styles.fieldGroup}>
             <label className={styles.label} htmlFor="login-email">Email</label>
             <input
               id="login-email"
-              className={`${styles.input} ${fieldErrors.email ? styles.inputError : ''}`}
+              className={`${styles.input} ${errors.email ? styles.inputError : ''}`}
               type="email"
               placeholder="you@example.com"
-              value={email}
-              onChange={(e) => { setEmail(e.target.value); if (fieldErrors.email) setFieldError('email', validateEmail(e.target.value)) }}
-              onBlur={() => setFieldError('email', validateEmail(email))}
               disabled={loading}
               autoComplete="email"
-              aria-describedby={fieldErrors.email ? 'login-email-error' : undefined}
-              aria-invalid={!!fieldErrors.email}
+              aria-invalid={!!errors.email}
+              aria-describedby={errors.email ? 'login-email-error' : undefined}
+              {...register('email', {
+                required: 'Email is required.',
+                pattern: { value: EMAIL_RE, message: 'Please enter a valid email address (e.g. you@example.com).' },
+              })}
             />
-            {fieldErrors.email && (
+            {errors.email && (
               <p id="login-email-error" className={styles.fieldError} role="alert">
                 <FiAlertCircle size={12} style={{ marginRight: 4, flexShrink: 0 }} />
-                {fieldErrors.email}
+                {errors.email.message}
               </p>
             )}
           </div>
@@ -137,21 +115,21 @@ export default function LoginPage() {
             <label className={styles.label} htmlFor="login-password">Password</label>
             <input
               id="login-password"
-              className={`${styles.input} ${fieldErrors.password ? styles.inputError : ''}`}
+              className={`${styles.input} ${errors.password ? styles.inputError : ''}`}
               type="password"
               placeholder="••••••••"
-              value={password}
-              onChange={(e) => { setPassword(e.target.value); if (fieldErrors.password) setFieldError('password', validatePassword(e.target.value)) }}
-              onBlur={() => setFieldError('password', validatePassword(password))}
               disabled={loading}
               autoComplete="current-password"
-              aria-describedby={fieldErrors.password ? 'login-password-error' : undefined}
-              aria-invalid={!!fieldErrors.password}
+              aria-invalid={!!errors.password}
+              aria-describedby={errors.password ? 'login-password-error' : undefined}
+              {...register('password', {
+                required: 'Password is required.',
+              })}
             />
-            {fieldErrors.password && (
+            {errors.password && (
               <p id="login-password-error" className={styles.fieldError} role="alert">
                 <FiAlertCircle size={12} style={{ marginRight: 4, flexShrink: 0 }} />
-                {fieldErrors.password}
+                {errors.password.message}
               </p>
             )}
           </div>
