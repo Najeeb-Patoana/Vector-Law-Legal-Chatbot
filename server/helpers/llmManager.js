@@ -12,9 +12,9 @@ const groq    = require("./groq");
  */
 async function generate(prompt, systemInstruction, temperature = 0.1) {
     const providers = [
+        { name: "Groq",   handler: groq   },
         { name: "Gemini", handler: gemini },
         { name: "OpenAI", handler: openai },
-        { name: "Groq",   handler: groq   },
     ];
 
     let lastError = null;
