@@ -1,9 +1,10 @@
 require("dotenv").config();
 
-const express   = require("express");
-const cors      = require("cors");
-const helmet    = require("helmet");
-const rateLimit = require("express-rate-limit");
+const express      = require("express");
+const cors         = require("cors");
+const helmet       = require("helmet");
+const rateLimit    = require("express-rate-limit");
+const cookieParser = require("cookie-parser");
 
 // ── Startup-time initializers ─────────────────────────────────────────────────
 const { initDB, scheduleVerificationCleanup } = require("./db");
@@ -32,10 +33,13 @@ app.use(helmet());
 
 app.use(cors({
     origin: ALLOWED_ORIGINS,
+    credentials: true,        
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
     optionsSuccessStatus: 200,
 }));
+
+app.use(cookieParser());
 
 app.use(express.json({ limit: "1mb" }));
 

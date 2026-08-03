@@ -11,28 +11,18 @@ export function AuthProvider({ children }) {
 
   // ── Silent token refresh on page load ──────────────────────────────────────
   useEffect(() => {
-    const storedRefresh = localStorage.getItem('refreshToken')
-    const storedUser    = localStorage.getItem('user')
-
-    if (!storedRefresh) {
-      setLoading(false)
-      return
-    }
-
-    authApi.refreshToken(storedRefresh)
+    // No stored refresh token to check — the browser sends the HttpOnly cookie
+    // automatically. Just attempt a silent refresh on every page load.
+    authApi.refreshToken()
       .then((data) => {
         if (data.success) {
           setAccessToken(data.accessToken)
           setApiToken(data.accessToken)
           setUser(data.user)
-        } else {
-          localStorage.removeItem('refreshToken')
-          localStorage.removeItem('user')
         }
       })
       .catch(() => {
-        localStorage.removeItem('refreshToken')
-        localStorage.removeItem('user')
+        // No valid session — user stays logged out
       })
       .finally(() => setLoading(false))
   }, [])
@@ -41,11 +31,13 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     if (!accessToken) return
     const interval = setInterval(async () => {
-      const stored = localStorage.getItem('refreshToken')
-      if (!stored) return
       try {
-        const data = await authApi.refreshToken(stored)
-        if (data.success) setAccessToken(data.accessToken)
+        // Cookie is sent automatically — no token argument needed
+        const data = await authApi.refreshToken()
+        if (data.success) {
+          setAccessToken(data.accessToken)
+          setApiToken(data.accessToken)
+        }
       } catch {
         // Let the next API call surface the 401
       }
@@ -76,7 +68,7 @@ export function AuthProvider({ children }) {
 
  const logout = useCallback(async () => {
     try { if (accessToken) await authApi.logout() } catch { /* ignore */ }
-    localStorage.removeItem('refreshToken')
+    // No localStorage refresh token to remove — the server clears the HttpOnly cookie
     localStorage.removeItem('user')
     setAccessToken(null)
     setUser(null)
@@ -84,11 +76,10 @@ export function AuthProvider({ children }) {
   }, [accessToken])
 
   function _storeSession(data) {
-    localStorage.setItem('refreshToken', data.refreshToken)
+    // refreshToken is now an HttpOnly cookie set by the server — never touch it here
     localStorage.setItem('user', JSON.stringify(data.user))
     setAccessToken(data.accessToken)
     setUser(data.user)
-
     setApiToken(data.accessToken) 
   }
 

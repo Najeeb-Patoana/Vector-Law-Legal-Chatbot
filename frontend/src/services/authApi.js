@@ -4,7 +4,8 @@ import axios from 'axios'
 // so they are forwarded by the Vite dev proxy to the backend.
 // In production, configure a reverse proxy or set VITE_API_URL at build time.
 const API = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '',
+  baseURL:         import.meta.env.VITE_API_URL || '',
+  withCredentials: true, // Send/receive HttpOnly cookies automatically
 })
 let currentToken = null;
 
@@ -48,8 +49,9 @@ export const login = (data) =>
 export const googleLogin = (credential) =>
   API.post('/api/auth/google', { credential }).then((r) => r.data)
 
-export const refreshToken = (refreshToken) =>
-  API.post('/api/auth/refresh', { refreshToken }).then((r) => r.data)
+// No body needed — the HttpOnly cookie is sent automatically by the browser
+export const refreshToken = () =>
+  API.post('/api/auth/refresh').then((r) => r.data)
 
 // Token is now attached automatically by the interceptor!
 export const logout = () =>
