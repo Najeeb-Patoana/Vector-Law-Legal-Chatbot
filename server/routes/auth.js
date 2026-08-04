@@ -318,7 +318,7 @@ router.post("/refresh", refreshLimiter, async (req, res) => {
   try {
     const refreshToken = req.cookies?.refreshToken;
     if (!refreshToken) {
-      return res.status(400).json({ success: false, message: "Refresh token required." });
+      return res.status(401).json({ success: false, message: "Unauthorized." });
     }
 
     const payload = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);

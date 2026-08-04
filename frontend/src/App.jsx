@@ -11,6 +11,24 @@ import './styles/global.css'
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
 
+const LoadingSpinner = (
+  <div style={{
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    minHeight: '100vh', background: '#060b14',
+    flexDirection: 'column', gap: 16,
+  }}>
+    <div style={{
+      width: 40, height: 40,
+      border: '3px solid rgba(15,118,110,0.2)',
+      borderTopColor: '#0f766e',
+      borderRadius: '50%',
+      animation: 'spin 0.8s linear infinite',
+    }} />
+    <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    <span style={{ color: '#475569', fontSize: '0.85rem' }}>Loading…</span>
+  </div>
+)
+
 function AppRoutes() {
   const { user, loading } = useAuth()
 
@@ -27,16 +45,22 @@ function AppRoutes() {
           element={user && !loading ? <Navigate to="/" replace /> : <RegisterPage />}
         />
 
-        {/* Main chat — accessible to EVERYONE (guests get 4 free messages) */}
+        {/* Main chat — accessible to EVERYONE (guests get 4 free messages).
+            While the silent token refresh is in flight we show a spinner so the
+            authenticated dashboard never flashes as a guest state. */}
         <Route
           path="/"
           element={
-            <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-              <Navbar />
-              <main style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                <ChatDashboard />
-              </main>
-            </div>
+            loading
+              ? LoadingSpinner
+              : (
+                <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+                  <Navbar />
+                  <main style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                    <ChatDashboard />
+                  </main>
+                </div>
+              )
           }
         />
 

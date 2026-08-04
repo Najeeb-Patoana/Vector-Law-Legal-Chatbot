@@ -20,8 +20,10 @@ export function AuthProvider({ children }) {
   }, [])
 
   // ── Silent token refresh on page load ──────────────────────────────────────
-  // No stored refresh token to check — the browser sends the HttpOnly cookie
-  // automatically. Just attempt a silent refresh on every page load.
+  // The browser sends the HttpOnly refresh cookie automatically (withCredentials).
+  // On success: restore the user session.
+  // On 401 (missing / expired / revoked cookie): stay logged out silently.
+  // Either way, .finally() sets loading=false so the UI can render.
   useEffect(() => {
     authApi.refreshToken()
       .then((data) => {
@@ -70,7 +72,8 @@ export function AuthProvider({ children }) {
 
   const logout = useCallback(async () => {
     try { if (accessToken) await authApi.logout() } catch { /* ignore */ }
-    // No localStorage refresh token to remove — the server clears the HttpOnly cookie
+    // Server clears the HttpOnly refresh cookie via res.clearCookie().
+    // On the next page load, refreshToken() will receive 401 and stay logged out.
     clearSession()
   }, [accessToken, clearSession])
 
