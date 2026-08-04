@@ -7,6 +7,8 @@ const API = axios.create({
   baseURL:         import.meta.env.VITE_API_URL || '',
   withCredentials: true, // Send/receive HttpOnly cookies automatically
 })
+
+// ── In-memory token store ────────────────────────────────────────────────────
 let currentToken = null;
 
 // The AuthProvider will call this to give Axios the token behind the scenes
@@ -14,6 +16,46 @@ export const setApiToken = (token) => {
   currentToken = token;
 }
 
+// ── Logout callback ───────────────────────────────────────────────────────────
+// AuthProvider registers its logout fn here so the response interceptor can
+// trigger a clean logout on refresh failure — without a circular import.
+let _onLogout = null;
+export const setOnLogout = (fn) => { _onLogout = fn; }
+
+// ── Dedicated refresh client ──────────────────────────────────────────────────
+// A plain Axios instance with NO interceptors, used only for the /refresh call.
+// This is the key to preventing infinite loops: the main API interceptor
+// will never intercept requests made through this client.
+const refreshClient = axios.create({
+  baseURL:         import.meta.env.VITE_API_URL || '',
+  withCredentials: true,
+})
+
+// ── Shared refresh promise ────────────────────────────────────────────────────
+// Ensures that only ONE /refresh request is ever in flight at a time.
+// If multiple requests receive 401 simultaneously, they all await the same
+// promise instead of each firing their own /refresh call.
+let refreshPromise = null;
+
+function doRefresh() {
+  if (refreshPromise) return refreshPromise;
+
+  refreshPromise = refreshClient
+    .post('/api/auth/refresh')
+    .then(({ data }) => {
+      setApiToken(data.accessToken);
+      return data.accessToken;
+    })
+    .finally(() => {
+      // Always clear the shared promise so the next genuine 401
+      // can start a fresh refresh cycle.
+      refreshPromise = null;
+    });
+
+  return refreshPromise;
+}
+
+// ── Request interceptor: attach access token ─────────────────────────────────
 API.interceptors.request.use(
   (config) => {
     if (currentToken) {
@@ -24,7 +66,49 @@ API.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Extract user-friendly messages from server error responses
+// ── Response interceptors ─────────────────────────────────────────────────────
+// Stage 1 — Auto-refresh on 401.
+// When a request fails with 401 (expired access token), this interceptor:
+//   1. Marks the original config with _retry to prevent infinite retries.
+//   2. Calls doRefresh() which fans all concurrent 401s into a single
+//      /api/auth/refresh request via the interceptor-free refreshClient.
+//      The HttpOnly cookie is sent automatically (withCredentials: true).
+//   3. Updates the in-memory token and retries the original request.
+//   4. On refresh failure, clears auth state and rejects the refresh error
+//      (not the original 401) so callers get actionable error info.
+API.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+
+    // Only attempt refresh for 401s that haven't already been retried
+    if (error?.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+
+      try {
+        // Fan all concurrent 401s into a single shared refresh request
+        const newToken = await doRefresh();
+
+        // Replay the original request with the fresh token
+        originalRequest.headers.Authorization = `Bearer ${newToken}`;
+        return API(originalRequest);
+      } catch (refreshError) {
+        // Refresh failed (expired/missing cookie) — force logout.
+        // Reject with the refresh error (not the original 401) so callers
+        // get the actual failure reason for debugging.
+        setApiToken(null);
+        if (_onLogout) _onLogout();
+        return Promise.reject(refreshError);
+      }
+    }
+
+    return Promise.reject(error);
+  }
+);
+
+// Stage 2 — Map server error messages to friendly Error objects.
+// Runs after the refresh interceptor so retried requests also get
+// friendly messages if they still fail for a non-auth reason.
 API.interceptors.response.use(
   (response) => response,
   (error) => {
