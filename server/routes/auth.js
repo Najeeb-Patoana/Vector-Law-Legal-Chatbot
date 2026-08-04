@@ -6,6 +6,7 @@ const crypto     = require("crypto");
 const nodemailer = require("nodemailer");
 const { OAuth2Client } = require("google-auth-library");
 const { pool, cleanupExpiredVerifications } = require("../db");
+const { loginLimiter, registerLimiter, googleLimiter, refreshLimiter } = require("../middleware/rateLimiters");
 
 const router       = express.Router();
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
@@ -65,7 +66,7 @@ function signRefresh(user) {
 }
 
 // ── POST /api/auth/register ───────────────────────────────────────────────────
-router.post("/register", async (req, res) => {
+router.post("/register", registerLimiter, async (req, res) => {
   try {
     const { email, password, name } = req.body;
 
@@ -208,7 +209,7 @@ router.get("/verify-email", async (req, res) => {
 });
 
 // ── POST /api/auth/login ──────────────────────────────────────────────────────
-router.post("/login", async (req, res) => {
+router.post("/login", loginLimiter, async (req, res) => {
   try {
     const { email, password } = req.body;
 
@@ -259,7 +260,7 @@ router.post("/login", async (req, res) => {
 });
 
 // ── POST /api/auth/google ─────────────────────────────────────────────────────
-router.post("/google", async (req, res) => {
+router.post("/google", googleLimiter, async (req, res) => {
   try {
     const { credential } = req.body;
     if (!credential) {
@@ -313,7 +314,7 @@ router.post("/google", async (req, res) => {
 });
 
 // ── POST /api/auth/refresh ────────────────────────────────────────────────────
-router.post("/refresh", async (req, res) => {
+router.post("/refresh", refreshLimiter, async (req, res) => {
   try {
     const refreshToken = req.cookies?.refreshToken;
     if (!refreshToken) {

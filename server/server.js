@@ -3,7 +3,6 @@ require("dotenv").config();
 const express      = require("express");
 const cors         = require("cors");
 const helmet       = require("helmet");
-const rateLimit    = require("express-rate-limit");
 const cookieParser = require("cookie-parser");
 
 // ── Startup-time initializers ─────────────────────────────────────────────────
@@ -43,24 +42,13 @@ app.use(cookieParser());
 
 app.use(express.json({ limit: "1mb" }));
 
-// ── Rate Limiters ─────────────────────────────────────────────────────────────
-
-const authLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,  
-    max: 10,               
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { success: false, message: "Too many attempts. Please try again in 15 minutes." },
-});
-
 // ── Routes ────────────────────────────────────────────────────────────────────
 
 app.get("/", (_req, res) => {
     res.json({ status: "ok", service: "US Legal Knowledge Base API" });
 });
 
-// Auth routes are protected by the strict authLimiter
-app.use("/api/auth",  authLimiter, authRouter);
+app.use("/api/auth",  authRouter);
 app.use("/api/chat",  chatRouter);
 app.use("/api/legal", legalRouter);  
 

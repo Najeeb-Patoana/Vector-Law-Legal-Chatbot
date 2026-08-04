@@ -1,7 +1,6 @@
 // routes/legal.js
 require("dotenv").config();
 const express   = require("express");
-const rateLimit = require("express-rate-limit");
 
 const { createEmbedding }          = require("../helpers/embedding");
 const { generate }                 = require("../helpers/llmManager");
@@ -10,6 +9,7 @@ const { rerank }                   = require("../helpers/reranker");
 const { pool }                     = require("../db");
 const { optionalAuth }             = require("../middleware/auth");
 const { isCasual }                 = require("../helpers/chatFilter"); // <-- Added this
+const { askLimiter }               = require("../middleware/rateLimiters");
 
 const { SYSTEM_INSTRUCTION, buildRagPrompt } = require("../prompts/prompts");
 
@@ -17,15 +17,6 @@ const router = express.Router();
 
 // ── Guest limit — single source of truth (server owns this value) ─────────────
 const GUEST_LIMIT = parseInt(process.env.GUEST_LIMIT ?? "4", 10);
-
-// ── Rate limiter — for the /ask endpoint only ─────────────────────────────────
-const askLimiter = rateLimit({
-    windowMs: 60 * 1000,
-    max: 60,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { success: false, message: "Too many questions. Please slow down." },
-});
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
