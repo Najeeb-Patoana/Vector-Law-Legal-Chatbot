@@ -8,7 +8,7 @@ const { searchGlobalLegalContext } = require("../helpers/qdrant");
 const { rerank }                   = require("../helpers/reranker");
 const { pool }                     = require("../db");
 const { optionalAuth }             = require("../middleware/auth");
-const { isCasual }                 = require("../helpers/chatFilter"); // <-- Added this
+const { isCasual }                 = require("../helpers/chatFilter");
 const { askLimiter }               = require("../middleware/rateLimiters");
 
 const { SYSTEM_INSTRUCTION, buildRagPrompt } = require("../prompts/prompts");
