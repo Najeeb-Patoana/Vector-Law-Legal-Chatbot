@@ -81,8 +81,13 @@ API.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    // Only attempt refresh for 401s that haven't already been retried
-    if (error?.response?.status === 401 && !originalRequest._retry) {
+    // Only attempt refresh for 401s on protected routes that haven't already been retried.
+    // Auth endpoints (login, register, google) intentionally return 401 for wrong credentials
+    // — we must NOT intercept those or we'll swallow the user-facing error message.
+    const url = originalRequest?.url || '';
+    const isAuthEndpoint = /\/api\/auth\/(login|register|google)/.test(url);
+
+    if (error?.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint) {
       originalRequest._retry = true;
 
       try {
