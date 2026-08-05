@@ -222,7 +222,7 @@ export default function ChatDashboard() {
                 <div className={sidebarStyles.userEmail}>{user?.email}</div>
               </div>
             </div>
-            <button type="button" className={sidebarStyles.logoutBtn} onClick={async () => { await logout(); navigate('/') }} id="logout-btn">
+            <button type="button" className={sidebarStyles.logoutBtn} onClick={logout} id="logout-btn">
               <FiLogOut size={13} />
               Sign out
             </button>
