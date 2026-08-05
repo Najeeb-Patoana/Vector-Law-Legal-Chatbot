@@ -45,11 +45,6 @@ function AppRoutes() {
           element={user && !loading ? <Navigate to="/" replace /> : <RegisterPage />}
         />
 
-        {/* Main chat — accessible to EVERYONE (guests get 4 free messages).
-            While the silent token refresh is in flight we show a spinner so the
-            authenticated dashboard never flashes as a guest state.
-            /chat/:sessionId encodes the active session in the URL so refreshing
-            the page restores the correct chat automatically. */}
         {["/", "/chat/:sessionId"].map((path) => (
           <Route
             key={path}

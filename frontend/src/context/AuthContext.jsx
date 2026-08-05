@@ -9,8 +9,6 @@ export function AuthProvider({ children }) {
   const [accessToken, setAccessToken] = useState(null)
   const [loading, setLoading]         = useState(true)
 
-  // ── Shared session cleanup ─────────────────────────────────────────────────
-  // Single source of truth for tearing down auth state.
   // Called on explicit logout, refresh failure, and provider unmount cleanup.
   const clearSession = useCallback(() => {
     localStorage.removeItem('user')

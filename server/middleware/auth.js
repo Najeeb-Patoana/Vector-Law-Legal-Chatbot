@@ -21,11 +21,6 @@ function requireAuth(req, res, next) {
   }
 }
 
-/**
- * Middleware: optionally verify a Bearer JWT.
- * If the token is present and valid → req.user is set (authenticated).
- * If absent or invalid → req.user stays null (guest). Never blocks the request.
- */
 function optionalAuth(req, res, next) {
   const header = req.headers["authorization"] || "";
   const token  = header.startsWith("Bearer ") ? header.slice(7) : null;

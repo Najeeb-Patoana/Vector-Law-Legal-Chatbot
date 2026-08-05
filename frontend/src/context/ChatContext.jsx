@@ -87,11 +87,6 @@ export function ChatProvider({ children }) {
       .finally(() => setSessionsLoading(false))
   }, [accessToken])
 
-  // ── Restore last active session after sessions load ───────────────────────
-  // After sessions are fetched from the server, check sessionStorage for the
-  // last session the user was viewing and restore it automatically.
-  // Using String() comparison handles cases where session_id is a number in
-  // the DB but a string in sessionStorage.
   useEffect(() => {
     if (!accessToken || sessions.length === 0) return
     const savedId = sessionStorage.getItem(LAST_SESSION_KEY)
