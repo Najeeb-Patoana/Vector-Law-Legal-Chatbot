@@ -98,12 +98,12 @@ async function start() {
 
     app.listen(PORT, () => {
         console.log(`\nUS Legal Knowledge Base  -->  http://localhost:${PORT}`);
-        console.log("  POST /api/legal/ask          -- ask a legal question or chat");
-        console.log("  GET  /api/legal/guest-status -- guest usage status");
-        console.log("  POST /api/auth/register      -- create account");
-        console.log("  POST /api/auth/login         -- login (rate limited)");
-        console.log("  POST /api/auth/google        -- Google OAuth (rate limited)");
-        console.log("  GET  /api/chat/sessions      -- list chat history");
+        // console.log("  POST /api/legal/ask          -- ask a legal question or chat");
+        // console.log("  GET  /api/legal/guest-status -- guest usage status");
+        // console.log("  POST /api/auth/register      -- create account");
+        // console.log("  POST /api/auth/login         -- login (rate limited)");
+        // console.log("  POST /api/auth/google        -- Google OAuth (rate limited)");
+        // console.log("  GET  /api/chat/sessions      -- list chat history");
         console.log(`  Allowed origins: ${ALLOWED_ORIGINS.join(", ")}\n`);
     });
 }
