@@ -5,7 +5,7 @@ import {
   FiPlus, FiMessageSquare, FiTrash2, FiLogOut, FiMenu, FiX,
   FiLock, FiLogIn
 } from 'react-icons/fi'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useChat } from '../context/ChatContext'
 import styles from './ChatDashboard.module.css'
@@ -13,6 +13,8 @@ import sidebarStyles from '../styles/Sidebar.module.css'
 
 export default function ChatDashboard() {
   const { user, logout } = useAuth()
+  const navigate = useNavigate()
+  const { sessionId: urlSessionId } = useParams()
   const {
     sessions, activeSession, messages,
     isLoading, sessionsLoading,
@@ -40,6 +42,18 @@ export default function ChatDashboard() {
   useEffect(() => {
     textareaRef.current?.focus()
   }, [activeSession])
+
+  // ── Keep URL in sync with activeSession (handles newly-created sessions) ───
+  // When sendMessage() auto-creates a session on the first message, activeSession
+  // changes but the URL is still "/". This effect pushes the correct URL so the
+  // session survives a page refresh.
+  useEffect(() => {
+    if (!activeSession) return
+    const expectedPath = `/chat/${activeSession.session_id}`
+    if (window.location.pathname !== expectedPath) {
+      navigate(expectedPath, { replace: true })
+    }
+  }, [activeSession, navigate])
 
   // ── Auto-resize textarea ───────────────────────────────────────────────────
   const adjustTextareaHeight = useCallback(() => {
@@ -80,6 +94,17 @@ export default function ChatDashboard() {
     textareaRef.current?.focus()
   }
 
+  // ── URL-aware wrappers ─────────────────────────────────────────────────────
+  const onSelectSession = (session) => {
+    handleSelectSession(session)
+    navigate(`/chat/${session.session_id}`)
+  }
+
+  const onNewChat = () => {
+    handleNewChat()
+    navigate('/')
+  }
+
   // ── Wrappers that keep stopPropagation in the UI layer ─────────────────────
   const onDeleteSession = (e, sessionId, title) => {
     e.stopPropagation()
@@ -88,8 +113,10 @@ export default function ChatDashboard() {
 
   const confirmDelete = () => {
     if (deleteConfirm) {
+      const isActive = activeSession?.session_id === deleteConfirm.sessionId
       handleDeleteSession(deleteConfirm.sessionId)
       setDeleteConfirm(null)
+      if (isActive) navigate('/')
     }
   }
 
@@ -144,7 +171,7 @@ export default function ChatDashboard() {
       {user && (
         <aside className={`${sidebarStyles.sidebar} ${!sidebarOpen ? sidebarStyles.sidebarHidden : ''}`}>
           <div className={sidebarStyles.sidebarTop}>
-            <button className={sidebarStyles.newChatBtn} onClick={handleNewChat} id="new-chat-btn">
+            <button className={sidebarStyles.newChatBtn} onClick={onNewChat} id="new-chat-btn">
               <FiPlus size={16} />
               New Chat
             </button>
@@ -165,11 +192,11 @@ export default function ChatDashboard() {
                   className={`${sidebarStyles.sessionItem} ${
                     activeSession?.session_id === session.session_id ? sidebarStyles.active : ''
                   }`}
-                  onClick={() => handleSelectSession(session)}
+                  onClick={() => onSelectSession(session)}
                   id={`session-${session.session_id}`}
                   role="button"
                   tabIndex={0}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSelectSession(session)}
+                  onKeyDown={(e) => e.key === 'Enter' && onSelectSession(session)}
                 >
                   <FiMessageSquare size={13} className={sidebarStyles.sessionIcon} />
                   <span className={sidebarStyles.sessionTitle} title={session.title}>

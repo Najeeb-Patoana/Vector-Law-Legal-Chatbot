@@ -3,7 +3,8 @@ import { useAuth } from './AuthContext'
 import { askLegalQuestion, getGuestStatus } from '../services/api.js'
 import * as chatApi from '../services/authApi.js'
 const DEFAULT_FREE_LIMIT = 4
-const GUEST_COUNT_KEY = 'vl_guestMsgCount'
+const GUEST_COUNT_KEY    = 'vl_guestMsgCount'
+const LAST_SESSION_KEY   = 'vl_lastSessionId'
 
 const ChatContext = createContext(null)
 
@@ -58,20 +59,50 @@ export function ChatProvider({ children }) {
       .catch(console.error)
   }, [user])
 
+  // Tracks whether we have ever held a valid token this session.
+  // Used to distinguish "initial page load (token not yet refreshed)" from
+  // "user explicitly logged out" so we don't wipe sessionStorage prematurely.
+  const wasAuthenticatedRef = useRef(false)
+
   // ── Load sessions whenever the user logs in; flush cache on logout ──────────
   useEffect(() => {
     if (!accessToken) {
       setSessions([])
       setActiveSession(null)
       messageCache.current = {} // flush all cached messages on logout
+      // Only clear the saved-session key when this is a REAL logout.
+      // On initial page load accessToken is null before refreshToken() runs —
+      // clearing here would wipe the key we need for session restore.
+      if (wasAuthenticatedRef.current) {
+        sessionStorage.removeItem(LAST_SESSION_KEY)
+        wasAuthenticatedRef.current = false
+      }
       return
     }
+    wasAuthenticatedRef.current = true   // mark that we're now authenticated
     setSessionsLoading(true)
     chatApi.getSessions()
       .then((data) => { if (data.success) setSessions(data.sessions) })
       .catch(console.error)
       .finally(() => setSessionsLoading(false))
   }, [accessToken])
+
+  // ── Restore last active session after sessions load ───────────────────────
+  // After sessions are fetched from the server, check sessionStorage for the
+  // last session the user was viewing and restore it automatically.
+  // Using String() comparison handles cases where session_id is a number in
+  // the DB but a string in sessionStorage.
+  useEffect(() => {
+    if (!accessToken || sessions.length === 0) return
+    const savedId = sessionStorage.getItem(LAST_SESSION_KEY)
+    if (!savedId) return
+    const found = sessions.find((s) => String(s.session_id) === savedId)
+    if (found) {
+      setActiveSession((prev) =>
+        prev?.session_id === found.session_id ? prev : found
+      )
+    }
+  }, [accessToken, sessions])
 
   // ── Load messages whenever the active session changes ─────────────────────
   // Uses in-memory cache: DB is only hit once per session per login.
@@ -118,6 +149,7 @@ export function ChatProvider({ children }) {
   const handleNewChat = useCallback(() => {
     setActiveSession(null)
     setMessages([])
+    sessionStorage.removeItem(LAST_SESSION_KEY)
   }, [])
 
   // ── handleSelectSession ────────────────────────────────────────────────────
@@ -125,9 +157,11 @@ export function ChatProvider({ children }) {
     setActiveSession((prev) =>
       prev?.session_id === session.session_id ? prev : session
     )
+    // Persist so a page refresh can restore this session
+    sessionStorage.setItem(LAST_SESSION_KEY, String(session.session_id))
   }, [])
 
-  // ── handleDeleteSession ────────────────────────────────────────────────────
+// ── handleDeleteSession ────────────────────────────────────────────────────
   const handleDeleteSession = useCallback(async (sessionId) => {
     try {
       await chatApi.deleteSession(sessionId)
@@ -166,6 +200,8 @@ export function ChatProvider({ children }) {
           currentSession = data.session
           setActiveSession(data.session)
           setSessions((prev) => [data.session, ...prev])
+          // Persist so a refresh immediately after starting a new chat still works
+          sessionStorage.setItem(LAST_SESSION_KEY, String(data.session.session_id))
         }
       } catch (err) {
         console.error('Create session error:', err)

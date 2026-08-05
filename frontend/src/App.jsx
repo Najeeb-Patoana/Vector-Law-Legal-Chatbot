@@ -47,22 +47,27 @@ function AppRoutes() {
 
         {/* Main chat — accessible to EVERYONE (guests get 4 free messages).
             While the silent token refresh is in flight we show a spinner so the
-            authenticated dashboard never flashes as a guest state. */}
-        <Route
-          path="/"
-          element={
-            loading
-              ? LoadingSpinner
-              : (
-                <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-                  <Navbar />
-                  <main style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                    <ChatDashboard />
-                  </main>
-                </div>
-              )
-          }
-        />
+            authenticated dashboard never flashes as a guest state.
+            /chat/:sessionId encodes the active session in the URL so refreshing
+            the page restores the correct chat automatically. */}
+        {["/", "/chat/:sessionId"].map((path) => (
+          <Route
+            key={path}
+            path={path}
+            element={
+              loading
+                ? LoadingSpinner
+                : (
+                  <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+                    <Navbar />
+                    <main style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                      <ChatDashboard />
+                    </main>
+                  </div>
+                )
+            }
+          />
+        ))}
 
         {/* Catch-all */}
         <Route path="*" element={<Navigate to="/" replace />} />
