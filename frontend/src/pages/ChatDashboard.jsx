@@ -23,15 +23,15 @@ export default function ChatDashboard() {
   } = useChat()
 
   // ── Local UI-only state ────────────────────────────────────────────────────
-  const [input,          setInput]          = useState('')
-  const [sidebarOpen,    setSidebarOpen]    = useState(true)
+  const [input, setInput] = useState('')
+  const [sidebarOpen, setSidebarOpen] = useState(true)
   const [showLimitModal, setShowLimitModal] = useState(false)
-  const [copiedId,       setCopiedId]       = useState(null)
-  const [deleteConfirm,  setDeleteConfirm]  = useState(null) // { sessionId, title }
+  const [copiedId, setCopiedId] = useState(null)
+  const [deleteConfirm, setDeleteConfirm] = useState(null) // { sessionId, title }
 
   // ── DOM refs ───────────────────────────────────────────────────────────────
   const messagesEndRef = useRef(null)
-  const textareaRef    = useRef(null)
+  const textareaRef = useRef(null)
 
   // ── Auto-scroll on new messages / typing indicator ────────────────────────
   useEffect(() => {
@@ -155,7 +155,7 @@ export default function ChatDashboard() {
     : '?'
 
   const remainingFree = Math.max(0, FREE_LIMIT - guestCount)
-  const guestAtLimit  = !user && guestCount >= FREE_LIMIT
+  const guestAtLimit = !user && guestCount >= FREE_LIMIT
 
   const suggestions = [
     { icon: <FiBookmark size={16} />, text: 'What is the punishment for bank robbery?' },
@@ -189,9 +189,8 @@ export default function ChatDashboard() {
               sessions.map((session) => (
                 <div
                   key={session.session_id}
-                  className={`${sidebarStyles.sessionItem} ${
-                    activeSession?.session_id === session.session_id ? sidebarStyles.active : ''
-                  }`}
+                  className={`${sidebarStyles.sessionItem} ${activeSession?.session_id === session.session_id ? sidebarStyles.active : ''
+                    }`}
                   onClick={() => onSelectSession(session)}
                   id={`session-${session.session_id}`}
                   role="button"
@@ -304,8 +303,8 @@ export default function ChatDashboard() {
                   <div className={`${styles.avatar} ${styles[`av_${msg.role}`]}`}>
                     {msg.role === 'user'
                       ? <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>
-                          {user ? initials : 'G'}
-                        </span>
+                        {user ? initials : 'G'}
+                      </span>
                       : <FiShield size={15} />
                     }
                   </div>
