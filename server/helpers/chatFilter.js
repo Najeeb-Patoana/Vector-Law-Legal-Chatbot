@@ -19,12 +19,9 @@ async function initFilterModel() {
  * @returns {Promise<boolean>} - Returns true if casual greeting, false if legal.
  */
 async function isCasual(text) {
-    if (!modelPipeline) {
-        await initFilterModel();
-    }
-
-    // ── 1. THE FAST PATH ──────────────────────────────────────────────────────
-    // Strip out punctuation (e.g., "how are you?" becomes "how are you")
+    // ── FAST PATH ONLY — no ML inference ──────────────────────────────────────
+    // This function now ONLY checks a hardcoded exact-match list of common greetings.
+    // All ML-based topic classification is handled by isLegalTopic().
     const cleanText = text.toLowerCase().trim().replace(/[^a-z\s]/g, "");
     
     const commonSmallTalk = [
@@ -35,29 +32,46 @@ async function isCasual(text) {
     ];
 
     if (commonSmallTalk.includes(cleanText)) {
-        console.log(`[FILTER] Fast-tracked as casual: "${cleanText}"`);
+        console.log(`[FILTER] Fast-tracked as casual greeting: "${cleanText}"`);
         return true;
     }
 
-    // ── 2. THE ML PATH ────────────────────────────────────────────────────────
-    // We tweaked the labels so "questions" doesn't confuse the AI
+    return false;
+}
+
+/**
+ * Evaluates whether a user input is related to US law or legal topics.
+ * @param {string} text - The raw user input.
+ * @returns {Promise<boolean>} - Returns true if legal, false if off-topic.
+ */
+async function isLegalTopic(text) {
+    if (!modelPipeline) {
+        await initFilterModel();
+    }
+
     const labels = [
-        "casual small talk, conversational greetings, or pleasantries", 
-        "specific legal inquiries or statutory issues"
+        "a question about US law, legal rights, court cases, statutes, regulations, legal procedures, or legal concepts",
+        "a question about programming, coding, software, technology, science, mathematics, history, entertainment, sports, or any non-legal subject",
     ];
-    
+
     const result = await modelPipeline(text, labels);
     const topLabel = result.labels[0];
     const topScore = result.scores[0];
 
-    console.log(`[FILTER] Label: "${topLabel}" | Confidence: ${topScore.toFixed(2)}`);
+    console.log(`[TOPIC FILTER] Label: "${topLabel.substring(0, 60)}..." | Confidence: ${topScore.toFixed(2)}`);
 
-    // Lowered threshold slightly to 0.45 just to be safe
-    if (topLabel === "casual small talk, conversational greetings, or pleasantries" && topScore > 0.45) {
+    // If top label is the LEGAL one with meaningful confidence, it's on-topic
+    if (topLabel === labels[0] && topScore > 0.40) {
         return true;
     }
-    
-    return false;
+
+    // If top label is the OFF-TOPIC one with strong confidence, block it
+    if (topLabel === labels[1] && topScore > 0.55) {
+        return false;
+    }
+
+    // Ambiguous — let it through to the LLM (the system prompt will handle it)
+    return true;
 }
 
-module.exports = { initFilterModel, isCasual };
+module.exports = { initFilterModel, isCasual, isLegalTopic };

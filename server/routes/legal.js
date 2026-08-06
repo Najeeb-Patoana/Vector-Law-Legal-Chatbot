@@ -8,7 +8,7 @@ const { searchGlobalLegalContext } = require("../helpers/qdrant");
 const { rerank }                   = require("../helpers/reranker");
 const { pool }                     = require("../db");
 const { optionalAuth }             = require("../middleware/auth");
-const { isCasual }                 = require("../helpers/chatFilter");
+const { isCasual, isLegalTopic }   = require("../helpers/chatFilter");
 const { askLimiter }               = require("../middleware/rateLimiters");
 
 const { SYSTEM_INSTRUCTION, buildRagPrompt } = require("../prompts/prompts");
@@ -27,7 +27,10 @@ function getClientIp(req) {
     return ip;
 }
 
-function sanitize(str, maxLen = 2000) {
+// Hard cap: 800 characters. Anything longer is rejected before processing.
+const MAX_QUESTION_LENGTH = 500;
+
+function sanitize(str, maxLen = MAX_QUESTION_LENGTH) {
     if (typeof str !== "string") return "";
     let clean = str.trim().slice(0, maxLen);
     clean = clean.replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -64,7 +67,13 @@ router.get("/guest-status", async (req, res) => {
 // ── POST /api/legal/ask ───────────────────────────────────────────────────────
 router.post("/ask", askLimiter, optionalAuth, async (req, res) => {
     try {
-        const question = sanitize(req.body?.question, 1000);
+        // ── Input validation ──────────────────────────────────────────────────
+        const rawQuestion = req.body?.question;
+        if (typeof rawQuestion === "string" && rawQuestion.trim().length > MAX_QUESTION_LENGTH) {
+            return sendError(res, 400, `Message is too long. Please keep your question under ${MAX_QUESTION_LENGTH} characters.`);
+        }
+
+        const question = sanitize(rawQuestion);
         if (!question) return sendError(res, 400, "Question cannot be empty.");
 
         console.log(`[ASK] New query (${question.length} chars)`);
@@ -98,13 +107,14 @@ router.post("/ask", askLimiter, optionalAuth, async (req, res) => {
             currentGuestUsage = newCount;
         }
 
-        // ── Intent 1: Local Semantic Chat Filter ──────────────────────────────
-        // Shortcut: If it's over 120 chars, it's definitely not a simple hello.
-        const isLengthy = question.length > 120;
-        const isCasualGreeting = !isLengthy && (await isCasual(question));
+        // ── Intent 1: Exact-match greeting fast-path (zero ML cost) ──────────
+        // isCasual() checks a hardcoded list first — no ML inference needed.
+        // Only runs for short messages; long messages skip straight to topic check.
+        const isShort = question.length <= 120;
+        const isExactGreeting = isShort && (await isCasual(question));
 
-        if (isCasualGreeting) {
-            console.log("[ASK] Semantic filter flagged casual chat — skipping Qdrant.");
+        if (isExactGreeting) {
+            console.log("[ASK] Fast-path matched a greeting — skipping Qdrant.");
             const chatResponse = await generate(question, SYSTEM_INSTRUCTION, 0.7);
             return res.status(200).json({
                 success:    true,
@@ -114,7 +124,21 @@ router.post("/ask", askLimiter, optionalAuth, async (req, res) => {
             });
         }
 
-        // ── Intent 2: Legal query — embed → search → rerank → generate ────────
+        // ── Intent 2: Single ML call — legal topic check ─────────────────────
+        // Covers both off-topic (coding, science, etc.) and ambiguous greetings
+        // that weren't caught by the exact-match list above.
+        const legalTopic = await isLegalTopic(question);
+        if (!legalTopic) {
+            console.log("[ASK] Off-topic query detected — refusing.");
+            return res.status(200).json({
+                success:    true,
+                answer:     "I'm Vector Law AI, a US Legal Information Assistant. I can only help with questions related to US law and legal topics. Please ask me a legal question.",
+                guestUsage: currentGuestUsage,
+                guestLimit: GUEST_LIMIT,
+            });
+        }
+
+        // ── Intent 3: Legal query — embed → search → rerank → generate ────────
         console.log("[ASK] Legal query — embedding…");
         const queryVector = await createEmbedding(question);
 

@@ -23,6 +23,7 @@ export default function ChatDashboard() {
   } = useChat()
 
   // ── Local UI-only state ────────────────────────────────────────────────────
+  const MAX_INPUT_LENGTH = 500
   const [input,          setInput]          = useState('')
   const [sidebarOpen,    setSidebarOpen]    = useState(true)
   const [showLimitModal, setShowLimitModal] = useState(false)
@@ -75,6 +76,7 @@ export default function ChatDashboard() {
   const handleSend = async () => {
     const trimmed = input.trim()
     if (!trimmed || isLoading) return
+    if (trimmed.length > MAX_INPUT_LENGTH) return // blocked by UI — safety guard
     setInput('')
     const result = await sendMessage(trimmed)
     if (result?.limitReached) {
@@ -375,7 +377,10 @@ export default function ChatDashboard() {
               className={styles.textarea}
               placeholder={guestAtLimit ? 'Sign in to continue chatting…' : 'Ask a legal question…'}
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value
+                if (val.length <= MAX_INPUT_LENGTH) setInput(val)
+              }}
               onKeyDown={handleKeyDown}
               rows={1}
               disabled={isLoading || guestAtLimit}
@@ -397,6 +402,15 @@ export default function ChatDashboard() {
               ? `${remainingFree} of ${FREE_LIMIT} free messages · Sign in for unlimited access`
               : 'Enter to send · Shift+Enter for new line · Responses cite indexed federal sources'
             }
+            {input.length > 0 && (
+              <span style={{
+                marginLeft: '0.5rem',
+                color: input.length >= MAX_INPUT_LENGTH ? 'var(--error, #f87171)' : input.length > MAX_INPUT_LENGTH * 0.85 ? 'var(--warn, #fbbf24)' : 'inherit',
+                fontWeight: input.length >= MAX_INPUT_LENGTH ? 600 : 400,
+              }}>
+                {input.length}/{MAX_INPUT_LENGTH}
+              </span>
+            )}
           </p>
         </div>
       </div>
